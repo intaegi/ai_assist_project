@@ -6,6 +6,8 @@ __pycache__/
 # Virtual environments
 venv/
 .env
+.env.*
+!.env.example
 .venv/
 env/
 ENV/
@@ -41,6 +43,8 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+data/
+.streamlit/secrets.toml
 
 # Nested/duplicate virtualenvs (e.g., lecture/lecture/Lib)
 lecture/**/Lib/

@@ -1,0 +1,64 @@
+[
+  {
+    "id": "requirement:sales:purchase",
+    "business_category": "sales",
+    "approval_type": "購入",
+    "required_fields": [
+      {"key": "purpose", "label": "営業目的", "type": "textarea", "required": true},
+      {"key": "vendor", "label": "取引先", "type": "text", "required": true},
+      {"key": "service_name", "label": "商品・サービス名", "type": "text", "required": true},
+      {"key": "amount", "label": "金額", "type": "number", "required": true}
+    ],
+    "required_documents": ["見積書"],
+    "conditional_documents": [
+      {"document": "契約書", "condition": "新規取引先または継続契約の場合"}
+    ],
+    "form_template": {
+      "title_format": "{vendor} {service_name}購入に関する決裁",
+      "body_sections": ["目的", "実施内容", "金額", "期待効果", "添付書類"]
+    },
+    "updated_by": "system"
+  },
+  {
+    "id": "requirement:finance:payment",
+    "business_category": "finance",
+    "approval_type": "支払",
+    "required_fields": [
+      {"key": "purpose", "label": "支払目的", "type": "textarea", "required": true},
+      {"key": "vendor", "label": "取引先", "type": "text", "required": true},
+      {"key": "amount", "label": "請求金額", "type": "number", "required": true},
+      {"key": "payment_due_date", "label": "支払期限", "type": "date", "required": true}
+    ],
+    "required_documents": ["請求書"],
+    "conditional_documents": [
+      {"document": "見積書", "condition": "新規取引または10万円以上の場合"}
+    ],
+    "form_template": {
+      "title_format": "{vendor}への支払に関する決裁",
+      "body_sections": ["支払目的", "請求内容", "金額", "支払期限", "添付書類"]
+    },
+    "updated_by": "system"
+  },
+  {
+    "id": "requirement:it:payment",
+    "business_category": "it",
+    "approval_type": "支払",
+    "required_fields": [
+      {"key": "purpose", "label": "利用目的", "type": "textarea", "required": true},
+      {"key": "vendor", "label": "取引先", "type": "text", "required": true},
+      {"key": "service_name", "label": "製品・サービス名", "type": "text", "required": true},
+      {"key": "amount", "label": "金額", "type": "number", "required": true},
+      {"key": "service_period", "label": "利用期間", "type": "date_range", "required": true}
+    ],
+    "required_documents": ["請求書"],
+    "conditional_documents": [
+      {"document": "見積書", "condition": "新規契約または10万円以上の場合"},
+      {"document": "契約書", "condition": "年間契約の場合"}
+    ],
+    "form_template": {
+      "title_format": "{vendor} {service_name}利用料の支払に関する決裁",
+      "body_sections": ["利用目的", "サービス内容", "利用期間", "金額", "セキュリティ確認", "添付書類"]
+    },
+    "updated_by": "system"
+  }
+]

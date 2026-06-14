@@ -5,9 +5,11 @@ from langchain_openai import AzureChatOpenAI
 from langchain_openai import AzureOpenAIEmbeddings
 from langchain_community.vectorstores.azuresearch import AzureSearch
 from langchain_core.prompts import PromptTemplate
+from dotenv import load_dotenv
 
 # インスタンス化
 app = FastAPI()
+load_dotenv()
 
 # 入力するデータ型の定義
 class UserInput(BaseModel):
@@ -19,28 +21,21 @@ class UserInput(BaseModel):
 def index():
     return {'message': 'chat'}
 
-# Azure リソースへの接続設定
-# AOAI を使うために環境変数を設定
-os.environ["AZURE_OPENAI_API_KEY"] = 'DYtn18AGRugHbIMGV9M9hgfO3yGwVaUAgsgCQQewFURsEotHGMWRJQQJ99CEACYeBjFXJ3w3AAABACOG9Blt'
-os.environ["AZURE_OPENAI_ENDPOINT"] = 'https://20260526-python.openai.azure.com/'
-os.environ["OPENAI_API_TYPE"] = 'azure'
-os.environ["OPENAI_API_VERSION"] = '2024-02-15-preview'
-
-# AI Search への接続情報
-vector_store_address = 'https://20260526-python.search.windows.net'
-vector_store_password = 'DWb4xLp5yRS7MFaVGh7vzR9Jx2RA40JRAHM6q7x1A7AzSeBNXy5h'
-index_name = '20260526python'
+# 研修例でも秘密情報はコードへ直接記載しない
+vector_store_address = os.environ["AZURE_SEARCH_ENDPOINT"]
+vector_store_password = os.environ["AZURE_SEARCH_API_KEY"]
+index_name = os.environ.get("AZURE_SEARCH_INDEX_NAME", "20260526python")
 
 # Chat モデルの定義
 llm = AzureChatOpenAI(
-    azure_deployment='gpt-4o-mini',
+    azure_deployment=os.environ["AZURE_OPENAI_CHAT_DEPLOYMENT"],
     temperature=0.2
 )
 
 # Embedding モデルの定義
 embeddings = AzureOpenAIEmbeddings(
-    model="text-embedding-ada-002",
-    deployment="text-embedding-ada-002",
+    model=os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
+    deployment=os.environ["AZURE_OPENAI_EMBEDDING_DEPLOYMENT"],
     chunk_size=1
 )
 

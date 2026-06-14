@@ -41,3 +41,11 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# Nested/duplicate virtualenvs (e.g., lecture/lecture/Lib)
+lecture/**/Lib/
+lecture/**/Scripts/
+lecture/**/Include/
+lecture/**/pyvenv.cfg
+lecture/**/site-packages/
+

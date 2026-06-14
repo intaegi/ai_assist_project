@@ -173,3 +173,68 @@ def test_validation_warnings_are_added_to_checklist():
 
     assert "金額が一致していること" in checklist
     assert any(item.startswith("要確認: 必要書類「見積書」") for item in checklist)
+
+
+def test_resolved_document_notice_is_added_and_removed_if_missing_again():
+    rag = RagService(None, None, DocumentService(), None, None)
+    case = _case_with_files(_file_record("invoice", "invoice.pdf", "請求書"))
+    previous = RagService._validate(
+        ["請求書"],
+        set(),
+        ApprovalForm(vendor="ABC株式会社", service_name="Cloud", amount=120000),
+    )
+    case.validation_results = RagService._validate(
+        ["請求書"],
+        {"請求書"},
+        ApprovalForm(vendor="ABC株式会社", service_name="Cloud", amount=120000),
+    )
+
+    rag.update_resolution_notices(case, previous)
+
+    assert case.resolution_notices[0].code == "MISSING_DOCUMENT_RESOLVED"
+    assert "請求書" in case.resolution_notices[0].message
+
+    previous = list(case.validation_results)
+    case.validation_results = RagService._validate(
+        ["請求書"],
+        set(),
+        ApprovalForm(vendor="ABC株式会社", service_name="Cloud", amount=120000),
+    )
+    rag.update_resolution_notices(case, previous)
+
+    assert case.resolution_notices == []
+
+
+def test_condition_change_does_not_claim_document_was_attached():
+    rag = RagService(None, None, DocumentService(), None, None)
+    case = _case_with_files()
+    previous = [
+        RagService._validate(
+            [],
+            set(),
+            ApprovalForm(
+                vendor="ABC株式会社",
+                service_name="Cloud",
+                amount=120000,
+                service_start_date="2026-07-01",
+                service_end_date="2027-06-30",
+            ),
+            [{"document": "契約書", "condition": "年間契約の場合"}],
+        )[0]
+    ]
+    case.validation_results = RagService._validate(
+        [],
+        set(),
+        ApprovalForm(
+            vendor="ABC株式会社",
+            service_name="Cloud",
+            amount=120000,
+            service_start_date="2026-07-01",
+            service_end_date="2026-07-31",
+        ),
+        [{"document": "契約書", "condition": "年間契約の場合"}],
+    )
+
+    rag.update_resolution_notices(case, previous)
+
+    assert case.resolution_notices == []

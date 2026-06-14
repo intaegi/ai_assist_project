@@ -5,6 +5,7 @@ from typing import Any
 from backend.app.schemas.models import (
     ApprovalForm,
     CaseRecord,
+    ChecklistVerificationItem,
     SimilarCase,
     SourceRef,
     ValidationResult,
@@ -20,7 +21,12 @@ class RagService:
         self.ai_service = ai_service
         self.search_service = search_service
 
-    def generate(self, case: CaseRecord) -> CaseRecord:
+    def generate(
+        self,
+        case: CaseRecord,
+        instruction: str = "initial_generation",
+    ) -> CaseRecord:
+        previous_validations = list(case.validation_results)
         requirement = self.data_store.get_requirement(case.business_category, case.approval_type) or {}
         document_text = self.document_service.joined_text(case.files)
         extracted = self.document_service.extract_basic_fields(document_text)
@@ -70,7 +76,9 @@ class RagService:
         case.title = payload.approval_form.title
         case.amount = payload.approval_form.amount
         case.checklist = self._reconcile_checklist(payload.checklist, validations)
+        case.checklist_verification = []
         case.validation_results = validations
+        self.update_resolution_notices(case, previous_validations)
         case.similar_cases = self._similar_cases(references, payload.approval_form)
         case.field_sources = self._field_sources(case, document_text, references)
         case.status = "generated"
@@ -85,7 +93,7 @@ class RagService:
                     key: [source.model_dump(mode="json") for source in value]
                     for key, value in case.field_sources.items()
                 },
-                "instruction": "initial_generation",
+                "instruction": instruction,
                 "created_at": utc_now(),
             }
         )
@@ -96,6 +104,7 @@ class RagService:
     def revise(self, case: CaseRecord, instruction: str, target_field: str) -> CaseRecord:
         case.approval_form = self.ai_service.revise(case.approval_form, instruction, target_field)
         self.refresh_validation(case)
+        case.checklist_verification = []
         case.current_version += 1
         case.updated_at = utc_now()
         case.last_generated_at = utc_now()
@@ -157,7 +166,108 @@ class RagService:
             self._document_consistency_validations(case, case.approval_form),
         )
         case.checklist = self._reconcile_checklist(case.checklist, case.validation_results)
+        case.checklist_verification = []
         return case
+
+    def verify_checklist(self, case: CaseRecord) -> CaseRecord:
+        self.refresh_validation(case)
+        payload = self.ai_service.verify_checklist(
+            checklist=case.checklist,
+            form=case.approval_form,
+            document_text=self.document_service.joined_text(case.files),
+            validation_results=[
+                item.model_dump(mode="json")
+                for item in case.validation_results
+            ],
+        )
+        by_item = {item.item: item for item in payload.results}
+        unresolved_messages = [
+            item.message
+            for item in case.validation_results
+            if item.severity in {"error", "warning"}
+        ]
+        missing_documents = [
+            str((item.basis or {}).get("document", ""))
+            for item in case.validation_results
+            if item.severity in {"error", "warning"}
+            and item.code in {
+                "REQUIRED_DOCUMENT_MISSING",
+                "CONDITIONAL_DOCUMENT_MISSING",
+            }
+        ]
+        verification = []
+        for item in case.checklist:
+            result = by_item.get(item) or ChecklistVerificationItem(
+                item=item,
+                status="not_verifiable",
+                message="AIから判定が返らなかったため、ユーザー確認が必要です。",
+            )
+            related_issues = [
+                message
+                for message in unresolved_messages
+                if item.startswith("要確認:")
+                or any(document and document in item for document in missing_documents)
+                or any(
+                    term in item and term in message
+                    for term in ("書類", "金額", "取引先", "サービス", "期間")
+                )
+            ]
+            if related_issues:
+                result = ChecklistVerificationItem(
+                    item=item,
+                    status="action_required",
+                    message="未解消の警告があるため、確認済みにはできません。",
+                    evidence=related_issues[:3],
+                )
+            verification.append(result)
+        case.checklist_verification = verification
+        case.updated_at = utc_now()
+        self.data_store.save_case(case.model_dump(mode="json"))
+        return case
+
+    def update_resolution_notices(
+        self,
+        case: CaseRecord,
+        previous_validations: list[ValidationResult],
+    ) -> None:
+        def missing_documents(items: list[ValidationResult]) -> dict[tuple[str, str], ValidationResult]:
+            result = {}
+            for item in items:
+                if item.code not in {
+                    "REQUIRED_DOCUMENT_MISSING",
+                    "CONDITIONAL_DOCUMENT_MISSING",
+                }:
+                    continue
+                document = str((item.basis or {}).get("document", ""))
+                if document:
+                    result[(item.code, document)] = item
+            return result
+
+        previous_missing = missing_documents(previous_validations)
+        current_missing = missing_documents(case.validation_results)
+        active_documents = {document for _, document in current_missing}
+        case.resolution_notices = [
+            item
+            for item in case.resolution_notices
+            if str((item.basis or {}).get("document", "")) not in active_documents
+        ]
+        existing = {
+            str((item.basis or {}).get("document", ""))
+            for item in case.resolution_notices
+        }
+        present_documents = self.document_service.document_types(case.files)
+        for key in previous_missing.keys() - current_missing.keys():
+            _, document = key
+            if document in existing or document not in present_documents:
+                continue
+            case.resolution_notices.append(
+                ValidationResult(
+                    severity="success",
+                    code="MISSING_DOCUMENT_RESOLVED",
+                    message=f"不足していた必要書類「{document}」が添付されました。",
+                    basis={"document": document},
+                )
+            )
 
     def _document_consistency_validations(
         self,
@@ -308,6 +418,7 @@ class RagService:
                         code="REQUIRED_DOCUMENT_MISSING",
                         message=f"必要書類「{document}」を確認できません。",
                         actions=["upload_file", "mark_exception"],
+                        basis={"document": document},
                     )
                 )
         for item in conditional_documents or []:

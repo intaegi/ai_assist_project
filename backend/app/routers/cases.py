@@ -5,7 +5,14 @@ from uuid import uuid4
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, Response, UploadFile
 
-from backend.app.schemas.models import CasePatch, CaseRecord, ChatRequest, FileRecord, utc_now
+from backend.app.schemas.models import (
+    CasePatch,
+    CaseRecord,
+    ChatRequest,
+    FileRecord,
+    GenerationRequest,
+    utc_now,
+)
 
 router = APIRouter(tags=["cases"])
 
@@ -138,12 +145,20 @@ def get_case(case_id: str, request: Request) -> dict:
 
 
 @router.post("/cases/{case_id}/generate")
-def generate_case(case_id: str, request: Request) -> dict:
+def generate_case(
+    case_id: str,
+    request: Request,
+    payload: GenerationRequest | None = None,
+) -> dict:
     case = _get_case(request, case_id)
     case.status = "processing"
     request.app.state.services.data_store.save_case(case.model_dump(mode="json"))
     try:
-        return request.app.state.services.rag_service.generate(case).model_dump(mode="json")
+        instruction = payload.instruction if payload else "initial_generation"
+        return request.app.state.services.rag_service.generate(
+            case,
+            instruction=instruction,
+        ).model_dump(mode="json")
     except Exception as exc:
         case.status = "failed"
         case.updated_at = utc_now()
@@ -175,15 +190,20 @@ def revise_case(case_id: str, payload: ChatRequest, request: Request) -> dict:
 @router.post("/cases/{case_id}/files")
 async def add_file(case_id: str, request: Request, file: UploadFile = File(...)) -> dict:
     case = _get_case(request, case_id)
+    previous_validations = list(case.validation_results)
     case.files.append(await _store_file(request, case_id, file))
+    services = request.app.state.services
+    services.rag_service.refresh_validation(case)
+    services.rag_service.update_resolution_notices(case, previous_validations)
     case.updated_at = utc_now()
-    request.app.state.services.data_store.save_case(case.model_dump(mode="json"))
+    services.data_store.save_case(case.model_dump(mode="json"))
     return case.model_dump(mode="json")
 
 
 @router.delete("/cases/{case_id}/files/{file_id}")
 def delete_file(case_id: str, file_id: str, request: Request) -> dict:
     case = _get_case(request, case_id)
+    previous_validations = list(case.validation_results)
     match = next((item for item in case.files if item.id == file_id), None)
     if not match:
         raise HTTPException(status_code=404, detail="ファイルが見つかりません。")
@@ -197,9 +217,22 @@ def delete_file(case_id: str, file_id: str, request: Request) -> dict:
         # Older cases may predate extracted-text persistence.
         pass
     case.files = [item for item in case.files if item.id != file_id]
+    request.app.state.services.rag_service.refresh_validation(case)
+    request.app.state.services.rag_service.update_resolution_notices(
+        case,
+        previous_validations,
+    )
     case.updated_at = utc_now()
     request.app.state.services.data_store.save_case(case.model_dump(mode="json"))
     return case.model_dump(mode="json")
+
+
+@router.post("/cases/{case_id}/checklist/verify")
+def verify_checklist(case_id: str, request: Request) -> dict:
+    case = _get_case(request, case_id)
+    return request.app.state.services.rag_service.verify_checklist(
+        case
+    ).model_dump(mode="json")
 
 
 @router.get("/cases/{case_id}/files/{file_id}")

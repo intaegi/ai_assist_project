@@ -5,7 +5,12 @@ from openai import AzureOpenAI
 from pydantic import ValidationError
 
 from backend.app.core.config import Settings
-from backend.app.schemas.models import ApprovalForm, GenerationPayload
+from backend.app.schemas.models import (
+    ApprovalForm,
+    ChecklistVerificationItem,
+    ChecklistVerificationPayload,
+    GenerationPayload,
+)
 
 
 SYSTEM_PROMPT = """あなたは社内決裁申請書の作成支援AIです。
@@ -55,6 +60,61 @@ class LocalAIService:
             else:
                 updated.body = f"{updated.body}\n\n修正指示: {instruction}".strip()
         return updated
+
+    def verify_checklist(
+        self,
+        *,
+        checklist: list[str],
+        form: ApprovalForm,
+        document_text: str,
+        validation_results: list[dict[str, Any]],
+    ) -> ChecklistVerificationPayload:
+        issues = [
+            str(item.get("message", ""))
+            for item in validation_results
+            if item.get("severity") in {"error", "warning"}
+        ]
+        results = []
+        normalized_text = document_text.replace(",", "")
+        for item in checklist:
+            if item.startswith("要確認:"):
+                results.append(
+                    ChecklistVerificationItem(
+                        item=item,
+                        status="action_required",
+                        message="未解消の警告があるため、ユーザー確認が必要です。",
+                        evidence=issues[:3],
+                    )
+                )
+                continue
+            evidence = []
+            if "金額" in item and form.amount is not None:
+                amount = str(int(form.amount))
+                if amount in normalized_text:
+                    evidence.append(f"添付書類とフォームの金額: {form.amount:,.0f}円")
+            if "取引先" in item and form.vendor and form.vendor in document_text:
+                evidence.append(f"添付書類とフォームの取引先: {form.vendor}")
+            if "利用期間" in item and form.service_start_date and form.service_end_date:
+                evidence.append(
+                    f"フォームの利用期間: {form.service_start_date} ～ {form.service_end_date}"
+                )
+            if "添付" in item or "必要書類" in item:
+                matching_issues = [issue for issue in issues if "書類" in issue]
+                if not matching_issues:
+                    evidence.append("必要書類の未解消警告はありません。")
+            results.append(
+                ChecklistVerificationItem(
+                    item=item,
+                    status="verified" if evidence else "not_verifiable",
+                    message=(
+                        "添付書類とフォームから確認できました。"
+                        if evidence
+                        else "現在の資料だけでは自動確認できません。"
+                    ),
+                    evidence=evidence,
+                )
+            )
+        return ChecklistVerificationPayload(results=results)
 
     def embed(self, text: str) -> list[float]:
         seed = [float((ord(char) % 31) / 31) for char in text[:64]]
@@ -131,6 +191,48 @@ class AzureAIService:
             ]
         )
         return ApprovalForm.model_validate(result)
+
+    def verify_checklist(
+        self,
+        *,
+        checklist: list[str],
+        form: ApprovalForm,
+        document_text: str,
+        validation_results: list[dict[str, Any]],
+    ) -> ChecklistVerificationPayload:
+        payload = {
+            "task": "チェックリストの各項目を、添付書類とフォームの明示的な根拠だけで確認してください。",
+            "rules": [
+                "根拠がある場合だけverifiedにする",
+                "未解消のエラーまたは警告に関係する項目はaction_requiredにする",
+                "資料から判断できない項目はnot_verifiableにする",
+                "推測で確認済みにしない",
+            ],
+            "checklist": checklist,
+            "current_form": form.model_dump(mode="json"),
+            "document_text": document_text[:18000],
+            "validation_results": validation_results,
+            "output_schema": ChecklistVerificationPayload.model_json_schema(),
+        }
+        messages = [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+        ]
+        last_error: Exception | None = None
+        for _ in range(2):
+            try:
+                return ChecklistVerificationPayload.model_validate(
+                    self._json_completion(messages)
+                )
+            except (ValidationError, json.JSONDecodeError) as exc:
+                last_error = exc
+                messages.append(
+                    {
+                        "role": "user",
+                        "content": "全チェック項目を含む、スキーマ適合JSONだけを再出力してください。",
+                    }
+                )
+        raise RuntimeError(f"チェックリストのAI判定を検証できませんでした: {last_error}")
 
     def embed(self, text: str) -> list[float]:
         response = self.client.embeddings.create(

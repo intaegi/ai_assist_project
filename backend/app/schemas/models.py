@@ -59,6 +59,17 @@ class ValidationResult(BaseModel):
     basis: dict[str, Any] | None = None
 
 
+class ChecklistVerificationItem(BaseModel):
+    item: str
+    status: Literal["verified", "action_required", "not_verifiable"]
+    message: str
+    evidence: list[str] = Field(default_factory=list)
+
+
+class ChecklistVerificationPayload(BaseModel):
+    results: list[ChecklistVerificationItem] = Field(default_factory=list)
+
+
 class ApprovalForm(BaseModel):
     title: str = ""
     vendor: str = ""
@@ -103,8 +114,10 @@ class CaseRecord(BaseModel):
     summary: str = ""
     approval_form: ApprovalForm = Field(default_factory=ApprovalForm)
     checklist: list[str] = Field(default_factory=list)
+    checklist_verification: list[ChecklistVerificationItem] = Field(default_factory=list)
     field_sources: dict[str, list[SourceRef]] = Field(default_factory=dict)
     validation_results: list[ValidationResult] = Field(default_factory=list)
+    resolution_notices: list[ValidationResult] = Field(default_factory=list)
     similar_cases: list[SimilarCase] = Field(default_factory=list)
     chat_logs: list[dict[str, Any]] = Field(default_factory=list)
     versions: list[dict[str, Any]] = Field(default_factory=list)
@@ -134,6 +147,10 @@ class ChatRequest(BaseModel):
     instruction: str
     target_field: str = "body"
     current_version: int | None = None
+
+
+class GenerationRequest(BaseModel):
+    instruction: str = "追加書類を反映して決裁案を再作成"
 
 
 class MaterialRecord(BaseModel):

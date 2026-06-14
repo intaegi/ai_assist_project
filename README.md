@@ -73,6 +73,12 @@ Blob Storage内の保存先:
 - `generated-outputs`: AI生成・再生成したバージョン別JSON
 - `search-knowledge`: Indexerへ渡す基準資料・過去決裁の正規化JSON
 
+Storage Account、Blobコンテナ、AI Searchリソースはそれぞれ独立したAzureリソース名です。
+そのためBlob側に`lim`というコンテナがなくても問題ありません。現在は
+Data source `lim-decision-rag-blob-datasource`がコンテナ`search-knowledge`の
+`documents/`プレフィックスを参照します。接続先は`python -m scripts.check_azure_connections`
+で確認できます。
+
 Azureモードの既定値はPull Indexer方式です。`bootstrap_azure`がBlob Data source、
 Text SplitとAzure OpenAI Embeddingを行うSkillset、5分間隔のIndexerを作成します。
 `POST /settings/reindex`は検索対象を`search-knowledge/documents/`へ同期してIndexerを即時実行します。

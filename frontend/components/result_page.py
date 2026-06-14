@@ -138,6 +138,119 @@ def _render_preview(client, case: dict) -> None:
     except (requests.RequestException, pdfium.PdfiumError) as exc:
         st.error(f"原本を表示できません: {exc}")
 
+
+def _render_document_recovery(client, case: dict) -> None:
+    actionable = [
+        item
+        for item in case.get("validation_results", [])
+        if "upload_file" in item.get("actions", [])
+    ]
+    if not actionable:
+        return
+
+    missing_names = []
+    for item in actionable:
+        document = (item.get("basis") or {}).get("document")
+        if document and document not in missing_names:
+            missing_names.append(document)
+
+    with st.container(border=True):
+        st.markdown("##### 不足書類を追加して再確認")
+        if missing_names:
+            st.caption("現在不足している書類: " + "、".join(missing_names))
+        files = st.file_uploader(
+            "追加書類",
+            type=["pdf", "jpg", "jpeg", "png"],
+            accept_multiple_files=True,
+            key=f"recovery_files_{case['case_id']}",
+        )
+        instruction = st.text_area(
+            "AIへの反映指示",
+            value="追加した書類の内容を確認し、決裁フォーム、要約、チェックリストを更新してください。",
+            height=90,
+            key=f"recovery_instruction_{case['case_id']}",
+        )
+        regenerate = st.checkbox(
+            "追加書類を反映してAI決裁案を再作成する",
+            value=True,
+            key=f"recovery_regenerate_{case['case_id']}",
+        )
+        if st.button(
+            "書類を追加して再確認",
+            type="primary",
+            use_container_width=True,
+            disabled=not files,
+            key=f"recovery_submit_{case['case_id']}",
+        ):
+            try:
+                with st.status("追加書類を確認しています", expanded=True) as status:
+                    for file in files or []:
+                        st.write(f"{file.name} を保存しています")
+                        client.add_file(case["case_id"], file)
+                    if regenerate:
+                        st.write("追加書類を反映してAI決裁案を再作成しています")
+                        client.generate(
+                            case["case_id"],
+                            instruction.strip()
+                            or "追加書類を反映して決裁案を再作成",
+                        )
+                    status.update(
+                        label="追加書類の再確認が完了しました",
+                        state="complete",
+                        expanded=False,
+                    )
+                st.session_state["document_recovery_message"] = (
+                    "追加書類を保存し、不足・注意とチェックリストを再確認しました。"
+                )
+                st.rerun()
+            except ApiError as exc:
+                st.error(str(exc))
+
+
+def _render_checklist(client, case: dict) -> None:
+    checklist = case.get("checklist", [])
+    if not checklist:
+        st.caption("確認項目はありません。")
+        return
+
+    if st.button(
+        "チェックリストをAIで確認",
+        use_container_width=True,
+        key=f"verify_checklist_{case['case_id']}",
+    ):
+        try:
+            with st.spinner("添付書類とフォームを照合しています"):
+                client.verify_checklist(case["case_id"])
+            st.rerun()
+        except ApiError as exc:
+            st.error(str(exc))
+
+    verification = {
+        item["item"]: item
+        for item in case.get("checklist_verification", [])
+    }
+    for index, item in enumerate(checklist):
+        st.checkbox(item, key=f"check_{case['case_id']}_{index}")
+        result = verification.get(item)
+        if not result:
+            continue
+        evidence = " / ".join(result.get("evidence", []))
+        status_label = {
+            "verified": "AI確認: 確認済み",
+            "action_required": "AI確認: 要対応",
+            "not_verifiable": "AI確認: 確認不可",
+        }[result["status"]]
+        message = f"{status_label} - {result.get('message', '')}"
+        if evidence:
+            message = f"{message} 根拠: {evidence}"
+        renderer = {
+            "verified": st.success,
+            "action_required": st.warning,
+            "not_verifiable": st.info,
+        }[result["status"]]
+        renderer(message)
+
+
 def render_result_page(client, case_id: str, history_mode: bool = False) -> None:
     try:
         case = client.get_case(case_id)
@@ -240,6 +353,10 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         st.info("比較できる添付書類がありません。")
 
     st.markdown("#### 不足・注意")
+    if message := st.session_state.pop("document_recovery_message", None):
+        st.success(message)
+    for item in case.get("resolution_notices", []):
+        st.success(item["message"])
     for item in case.get("validation_results", []):
         renderer = {
             "error": st.error,
@@ -248,13 +365,10 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             "success": st.success,
         }[item["severity"]]
         renderer(item["message"])
+    _render_document_recovery(client, case)
 
     st.markdown("#### チェックリスト")
-    checklist = case.get("checklist", [])
-    if not checklist:
-        st.caption("確認項目はありません。")
-    for index, item in enumerate(checklist):
-        st.checkbox(item, key=f"check_{case_id}_{index}")
+    _render_checklist(client, case)
 
     st.markdown("#### 必要書類")
     documents = current_form.get("required_documents", [])

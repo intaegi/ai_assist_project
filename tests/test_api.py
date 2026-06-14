@@ -1,3 +1,6 @@
+from pathlib import Path
+
+
 def create_case(client, category="it", approval_type="支払"):
     response = client.post(
         "/cases",
@@ -125,6 +128,114 @@ def test_file_add_inline_get_and_delete(client):
     assert deleted.status_code == 200
     assert deleted.json()["files"] == []
     assert not extracted_text.exists()
+
+
+def test_missing_document_is_revalidated_and_marked_resolved_after_upload(client):
+    case = create_case(client)
+    generated = client.post(f"/cases/{case['case_id']}/generate").json()
+    assert any(
+        item["code"] == "REQUIRED_DOCUMENT_MISSING"
+        and item["basis"]["document"] == "請求書"
+        for item in generated["validation_results"]
+    )
+
+    added = client.post(
+        f"/cases/{case['case_id']}/files",
+        files={"file": ("invoice.png", b"\x89PNG\r\n\x1a\nfake", "image/png")},
+    )
+
+    assert added.status_code == 200, added.text
+    payload = added.json()
+    assert not any(
+        item["code"] == "REQUIRED_DOCUMENT_MISSING"
+        and item["basis"]["document"] == "請求書"
+        for item in payload["validation_results"]
+    )
+    assert any(
+        item["code"] == "MISSING_DOCUMENT_RESOLVED"
+        and "請求書" in item["message"]
+        for item in payload["resolution_notices"]
+    )
+
+
+def test_tc_ui_006_estimate_then_invoice_resolves_required_document(client):
+    pdf_root = Path("sample_data/test_documents/pdf")
+    created = client.post(
+        "/cases",
+        data={
+            "business_category": "it",
+            "approval_type": "支払",
+            "description": "CloudGuard Proの年間利用料を支払います。",
+            "category_fields": "{}",
+        },
+        files={
+            "files": (
+                "TC-DOC-02_it_estimate_cloudguard.pdf",
+                (pdf_root / "TC-DOC-02_it_estimate_cloudguard.pdf").read_bytes(),
+                "application/pdf",
+            )
+        },
+    ).json()
+
+    generated = client.post(f"/cases/{created['case_id']}/generate").json()
+    assert any(
+        item["code"] == "REQUIRED_DOCUMENT_MISSING"
+        and item["basis"]["document"] == "請求書"
+        for item in generated["validation_results"]
+    )
+
+    added = client.post(
+        f"/cases/{created['case_id']}/files",
+        files={
+            "file": (
+                "TC-DOC-01_it_invoice_cloudguard.pdf",
+                (pdf_root / "TC-DOC-01_it_invoice_cloudguard.pdf").read_bytes(),
+                "application/pdf",
+            )
+        },
+    ).json()
+
+    assert not any(
+        item["code"] == "REQUIRED_DOCUMENT_MISSING"
+        for item in added["validation_results"]
+    )
+    assert added["resolution_notices"][-1]["message"] == (
+        "不足していた必要書類「請求書」が添付されました。"
+    )
+
+
+def test_regeneration_instruction_is_saved_as_new_version(client):
+    case = create_case(client)
+    client.post(f"/cases/{case['case_id']}/generate")
+
+    response = client.post(
+        f"/cases/{case['case_id']}/generate",
+        json={"instruction": "追加請求書を反映して再作成"},
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["current_version"] == 2
+    assert payload["versions"][-1]["instruction"] == "追加請求書を反映して再作成"
+
+
+def test_ai_checklist_verification_is_saved(client):
+    case = create_case(client)
+    generated = client.post(f"/cases/{case['case_id']}/generate").json()
+
+    response = client.post(f"/cases/{case['case_id']}/checklist/verify")
+
+    assert response.status_code == 200, response.text
+    results = response.json()["checklist_verification"]
+    assert len(results) == len(generated["checklist"])
+    assert {item["status"] for item in results} <= {
+        "verified",
+        "action_required",
+        "not_verifiable",
+    }
+    assert any(item["status"] == "action_required" for item in results)
+    invoice_check = next(item for item in results if "請求書" in item["item"])
+    assert invoice_check["status"] == "action_required"
 
 
 def test_requirement_setting_can_be_updated(client):

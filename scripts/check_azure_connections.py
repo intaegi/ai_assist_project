@@ -101,12 +101,20 @@ def main() -> None:
             embed = ai_service.embed if ai_service else lambda _: []
             search = AzureSearchService(settings, embed, blob)
             indexer_status = ""
+            data_source_status = ""
             if settings.azure_search_ingestion_mode == "indexer":
                 status = search.indexer_client.get_indexer_status(
                     settings.azure_search_indexer_name
                 )
                 last_status = getattr(status.last_result, "status", "not-run")
                 indexer_status = f", indexer_status={last_status}"
+                data_source = search.indexer_client.get_data_source_connection(
+                    settings.azure_search_data_source_name
+                )
+                data_source_status = (
+                    f", data_source={data_source.name}"
+                    f"->{data_source.container.name}/{data_source.container.query or ''}"
+                )
             print_result(
                 "Azure AI Search",
                 "OK" if search.check() else "ERROR",
@@ -114,7 +122,7 @@ def main() -> None:
                     f"index={settings.azure_search_index_name}, "
                     f"documents={search.client.get_document_count()}, "
                     f"registration={settings.azure_search_ingestion_mode}"
-                    f"{indexer_status}"
+                    f"{indexer_status}{data_source_status}"
                 ),
             )
         except Exception as exc:

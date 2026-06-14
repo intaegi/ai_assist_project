@@ -61,8 +61,9 @@ class ApiClient:
         ]
         return self._request("POST", "/cases", data=data, files=files)
 
-    def generate(self, case_id: str) -> dict:
-        return self._request("POST", f"/cases/{case_id}/generate")
+    def generate(self, case_id: str, instruction: str | None = None) -> dict:
+        kwargs = {"json": {"instruction": instruction}} if instruction else {}
+        return self._request("POST", f"/cases/{case_id}/generate", **kwargs)
 
     def list_cases(self) -> list[dict]:
         return self._request("GET", "/cases")
@@ -86,6 +87,9 @@ class ApiClient:
     def add_file(self, case_id: str, file: Any) -> dict:
         files = {"file": (file.name, file.getvalue(), file.type)}
         return self._request("POST", f"/cases/{case_id}/files", files=files)
+
+    def verify_checklist(self, case_id: str) -> dict:
+        return self._request("POST", f"/cases/{case_id}/checklist/verify")
 
     def file_url(self, case_id: str, file_id: str) -> str:
         return f"{self.base_url}/cases/{case_id}/files/{file_id}"

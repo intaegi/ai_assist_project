@@ -16,6 +16,10 @@ def test_result_uses_chat_input_without_save_button():
     assert 'st.expander("詳細情報"' in source
     assert "フォーム内容をコピー" in source
     assert "build_comparison_rows" in source
+    assert "不足書類を追加して再確認" in source
+    assert "書類を追加して再確認" in source
+    assert "チェックリストをAIで確認" in source
+    assert "resolution_notices" in source
     assert "変更内容を保存" not in source
     assert "作成完了" not in source
 

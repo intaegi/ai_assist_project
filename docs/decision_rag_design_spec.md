@@ -1,5 +1,9 @@
 # 生成AIによる決裁書類作成支援Webアプリ 設計書・仕様書
 
+> **旧版:** このファイルは初期設計の記録です。現在の実装仕様は
+> [`decision_rag_design_spec_ja.md`](decision_rag_design_spec_ja.md)を参照してください。
+> 韓国語版は[`decision_rag_design_spec_ko.md`](decision_rag_design_spec_ko.md)です。
+
 ## 1. 企画概要
 
 ### 1.1 システム名

@@ -59,31 +59,29 @@ async def upload_material(
 
 
 @router.post("/reindex")
-def reindex(request: Request) -> dict[str, int]:
+def reindex(request: Request) -> dict[str, int | str]:
     services = request.app.state.services
     documents = services.data_store.list_materials() + services.data_store.list_past_decisions()
     if not documents:
         raise HTTPException(status_code=400, detail="インデックス対象の資料がありません。")
-    normalized = []
+    normalized_by_id = {}
     for item in documents:
-        normalized.append(
-            {
-                "id": item["id"],
-                "case_id": item.get("case_id", ""),
-                "knowledge_type": item.get("knowledge_type", "past_case"),
-                "rule_priority": int(item.get("rule_priority", 2)),
-                "business_category": item.get("business_category", "all"),
-                "approval_type": item.get("approval_type", "all"),
-                "approval_no": item.get("approval_no", ""),
-                "title": item.get("title", ""),
-                "approval_category_no": item.get("approval_category_no", ""),
-                "amount": item.get("amount"),
-                "content": item.get("content") or item.get("body", ""),
-                "required_documents": item.get("required_documents", []),
-                "source_type": item.get("source_type", item.get("knowledge_type", "reference")),
-                "file_name": item.get("file_name", ""),
-                "page": item.get("page"),
-            }
-        )
-    count = services.search_service.index_documents(normalized)
-    return {"indexed": count}
+        normalized_by_id[item["id"]] = {
+            "id": item["id"],
+            "case_id": item.get("case_id", ""),
+            "knowledge_type": item.get("knowledge_type", "past_case"),
+            "rule_priority": int(item.get("rule_priority", 2)),
+            "business_category": item.get("business_category", "all"),
+            "approval_type": item.get("approval_type", "all"),
+            "approval_no": item.get("approval_no", ""),
+            "title": item.get("title", ""),
+            "approval_category_no": item.get("approval_category_no", ""),
+            "amount": item.get("amount"),
+            "content": item.get("content") or item.get("body", ""),
+            "required_documents": item.get("required_documents", []),
+            "source_type": item.get("source_type", item.get("knowledge_type", "reference")),
+            "file_name": item.get("file_name", ""),
+            "page": item.get("page"),
+        }
+    count = services.search_service.index_documents(list(normalized_by_id.values()))
+    return {"indexed": count, "mode": services.settings.app_storage_mode}

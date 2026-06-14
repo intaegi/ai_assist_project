@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import streamlit as st
 
 from frontend.api_client import ApiError
@@ -52,38 +54,60 @@ def render_settings_page(client) -> None:
                 st.error(str(exc))
 
     with tab_materials:
-        category_label = st.selectbox("対象カテゴリ", list(CATEGORIES), key="material_category")
-        approval_type = st.selectbox("対象決裁種類", APPROVAL_TYPES, key="material_type")
-        knowledge_type = st.selectbox(
-            "資料種別",
-            ["policy", "template", "required_document_rule", "past_case"],
-            format_func={
-                "policy": "決裁規程",
-                "template": "標準様式",
-                "required_document_rule": "必要書類基準",
-                "past_case": "サンプル過去決裁",
-            }.get,
-        )
-        title = st.text_input("資料タイトル")
-        material = st.file_uploader("基準資料", type=["pdf", "md", "txt"])
-        if st.button("資料を登録", disabled=not title or material is None):
+        st.caption("基準資料は1件ずつ登録します。登録後、次の資料を選択してください。")
+        with st.form("material_registration", clear_on_submit=True):
+            category_label = st.selectbox("対象カテゴリ", list(CATEGORIES), key="material_category")
+            approval_type = st.selectbox("対象決裁種類", APPROVAL_TYPES, key="material_type")
+            knowledge_type = st.radio(
+                "資料種別",
+                ["policy", "template", "required_document_rule", "past_case"],
+                horizontal=True,
+                format_func={
+                    "policy": "決裁規程",
+                    "template": "標準様式",
+                    "required_document_rule": "必要書類基準",
+                    "past_case": "サンプル過去決裁",
+                }.get,
+            )
+            title = st.text_input("資料タイトル（未入力時はファイル名を使用）")
+            material = st.file_uploader("基準資料", type=["pdf", "md", "txt"])
+            register = st.form_submit_button(
+                "資料を登録",
+                type="primary",
+            )
+        if register:
+            if material is None:
+                st.error("登録する基準資料を選択してください。")
+                return
             try:
+                resolved_title = title.strip() or Path(material.name).stem
                 client.upload_material(
                     {
                         "business_category": CATEGORIES[category_label],
                         "approval_type": approval_type,
                         "knowledge_type": knowledge_type,
-                        "title": title,
+                        "title": resolved_title,
                     },
                     material,
                 )
                 st.success("資料を登録しました。")
             except ApiError as exc:
                 st.error(str(exc))
-        if st.button("検索インデックスを更新"):
+        reindex_slot = st.empty()
+        if reindex_slot.button("検索インデックスを更新", key="reindex_materials"):
+            reindex_slot.empty()
             try:
-                result = client.reindex()
-                st.success(f"{result['indexed']}件をインデックスへ登録しました。")
+                with st.status("検索インデックスを更新しています", expanded=True) as status:
+                    st.write("登録済みの基準資料と過去決裁をAzure AI Searchへ送信しています。")
+                    result = client.reindex()
+                    status.update(label="検索インデックスを更新しました", state="complete", expanded=False)
+                if result.get("mode") == "azure":
+                    st.success(f"{result['indexed']}件をAzure AI Searchへ登録しました。")
+                else:
+                    st.info(
+                        f"Local mode: 検索対象{result['indexed']}件を確認しました。"
+                        "Azure AI Searchへは送信されていません。"
+                    )
             except ApiError as exc:
                 st.error(str(exc))
 
@@ -91,10 +115,32 @@ def render_settings_page(client) -> None:
         st.caption("この情報は初期設定画面だけに表示します。")
         try:
             result = client.dependency_health()
+            if result.get("mode") == "local":
+                st.info(
+                    "現在はLocal modeです。データはローカルに保存され、"
+                    "Azure Blob Storage、AI Search、Cosmos DB、Azure OpenAIは使用しません。"
+                )
             for name, status in result["checks"].items():
                 if status["status"] == "ok":
-                    st.success(f"{name}: 接続済み")
+                    suffix = "ローカル動作中" if result.get("mode") == "local" else "接続済み"
+                    st.success(f"{name}: {suffix}")
+                elif status["status"] == "skipped":
+                    st.warning(f"{name}: {status.get('message', '未使用')}")
                 else:
                     st.error(f"{name}: {status.get('message', '接続エラー')}")
+                details = status.get("details", {})
+                if name == "blob" and details:
+                    st.caption(
+                        f"Storage account: {details.get('storage_account') or '-'} / "
+                        f"Containers: {', '.join(details.get('containers', []))}"
+                    )
+                elif name == "search" and details:
+                    st.caption(
+                        f"Index: {details.get('index') or '-'} / "
+                        "登録方式: アプリケーションからSDKで直接登録"
+                    )
+                    st.caption("Indexer・Data source・Skillsetはこの方式では作成しません。")
+                elif name == "cosmos" and details:
+                    st.caption(f"履歴・設定の保存先: {details.get('database') or '-'}")
         except ApiError as exc:
             st.error(str(exc))

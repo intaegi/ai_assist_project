@@ -13,8 +13,9 @@ class ApiClient:
         self.base_url = (base_url or os.getenv("BACKEND_URL", "http://localhost:8000")).rstrip("/")
 
     def _request(self, method: str, path: str, **kwargs: Any) -> Any:
+        timeout = kwargs.pop("timeout", 120)
         try:
-            response = requests.request(method, f"{self.base_url}{path}", timeout=120, **kwargs)
+            response = requests.request(method, f"{self.base_url}{path}", timeout=timeout, **kwargs)
         except requests.RequestException as exc:
             raise ApiError(f"バックエンドへ接続できません: {exc}") from exc
         if not response.ok:
@@ -28,7 +29,7 @@ class ApiClient:
         return response.json()
 
     def health(self) -> dict:
-        return self._request("GET", "/health")
+        return self._request("GET", "/health", timeout=5)
 
     def dependency_health(self) -> dict:
         return self._request("GET", "/health/dependencies")

@@ -1,3 +1,4 @@
+import hashlib
 import json
 import threading
 from pathlib import Path
@@ -9,6 +10,15 @@ from azure.storage.blob import BlobServiceClient, ContentSettings
 from backend.app.core.config import Settings
 
 
+REQUIRED_BLOB_CONTAINERS = (
+    "config-materials",
+    "uploaded-documents",
+    "extracted-texts",
+    "generated-outputs",
+    "search-knowledge",
+)
+
+
 class LocalDataStore:
     def __init__(self, root: Path):
         self.root = root
@@ -17,6 +27,15 @@ class LocalDataStore:
         self.lock = threading.RLock()
         if not self.path.exists():
             self._write({"cases": {}, "requirements": [], "materials": [], "past_decisions": []})
+        else:
+            data = self._read()
+            materials = data.get("materials", [])
+            unique_materials = {}
+            for index, item in enumerate(materials):
+                unique_materials[item.get("id") or f"legacy:{index}"] = item
+            if len(unique_materials) != len(materials):
+                data["materials"] = list(unique_materials.values())
+                self._write(data)
 
     def _read(self) -> dict[str, Any]:
         with self.lock:
@@ -67,12 +86,18 @@ class LocalDataStore:
 
     def save_material(self, material: dict[str, Any]) -> dict[str, Any]:
         data = self._read()
+        data["materials"] = [
+            item for item in data["materials"] if item.get("id") != material.get("id")
+        ]
         data["materials"].append(material)
         self._write(data)
         return material
 
     def list_materials(self) -> list[dict[str, Any]]:
-        return self._read()["materials"]
+        unique = {}
+        for item in self._read()["materials"]:
+            unique[item["id"]] = item
+        return list(unique.values())
 
     def seed_past_decisions(self, decisions: list[dict[str, Any]]) -> None:
         data = self._read()
@@ -82,13 +107,16 @@ class LocalDataStore:
     def list_past_decisions(self) -> list[dict[str, Any]]:
         return self._read()["past_decisions"]
 
+    def check(self) -> bool:
+        return self.path.exists()
+
 
 class AzureDataStore:
     def __init__(self, settings: Settings):
         client = CosmosClient(settings.azure_cosmos_endpoint, credential=settings.azure_cosmos_key)
-        database = client.get_database_client(settings.azure_cosmos_database)
-        self.decisions = database.get_container_client(settings.azure_cosmos_decision_container)
-        self.past = database.get_container_client(settings.azure_cosmos_past_container)
+        self.database = client.get_database_client(settings.azure_cosmos_database)
+        self.decisions = self.database.get_container_client(settings.azure_cosmos_decision_container)
+        self.past = self.database.get_container_client(settings.azure_cosmos_past_container)
 
     def save_case(self, case: dict[str, Any]) -> dict[str, Any]:
         item = {**case, "partition_key": case["case_id"], "document_type": "case"}
@@ -150,6 +178,10 @@ class AzureDataStore:
     def list_past_decisions(self) -> list[dict[str, Any]]:
         return list(self.past.read_all_items())
 
+    def check(self) -> bool:
+        self.database.read()
+        return True
+
 
 class LocalBlobStore:
     def __init__(self, root: Path):
@@ -176,9 +208,33 @@ class LocalBlobStore:
     def check(self) -> bool:
         return self.root.exists()
 
+    def sync_json_documents(
+        self,
+        container: str,
+        prefix: str,
+        documents: list[dict[str, Any]],
+    ) -> int:
+        target_root = self.root / container / prefix
+        target_root.mkdir(parents=True, exist_ok=True)
+        expected = set()
+        for document in documents:
+            name = f"{hashlib.sha256(document['id'].encode('utf-8')).hexdigest()}.json"
+            expected.add(name)
+            self.upload(
+                container,
+                f"{prefix}/{name}",
+                json.dumps(document, ensure_ascii=False).encode("utf-8"),
+                "application/json",
+            )
+        for existing in target_root.glob("*.json"):
+            if existing.name not in expected:
+                existing.unlink()
+        return len(documents)
+
 
 class AzureBlobStore:
     def __init__(self, settings: Settings):
+        self.settings = settings
         self.client = BlobServiceClient.from_connection_string(settings.azure_storage_connection_string)
 
     def upload(self, container: str, path: str, content: bytes, content_type: str) -> str:
@@ -200,8 +256,32 @@ class AzureBlobStore:
         return self.upload(container, destination, self.download(container, source), content_type)
 
     def check(self) -> bool:
-        next(self.client.list_containers(results_per_page=1).by_page())
-        return True
+        existing = {item["name"] for item in self.client.list_containers()}
+        required = set(REQUIRED_BLOB_CONTAINERS)
+        required.add(self.settings.azure_search_knowledge_container)
+        return required.issubset(existing)
+
+    def sync_json_documents(
+        self,
+        container: str,
+        prefix: str,
+        documents: list[dict[str, Any]],
+    ) -> int:
+        container_client = self.client.get_container_client(container)
+        expected = set()
+        for document in documents:
+            name = f"{prefix}/{hashlib.sha256(document['id'].encode('utf-8')).hexdigest()}.json"
+            expected.add(name)
+            self.upload(
+                container,
+                name,
+                json.dumps(document, ensure_ascii=False).encode("utf-8"),
+                "application/json",
+            )
+        for blob in container_client.list_blobs(name_starts_with=f"{prefix}/"):
+            if blob.name not in expected:
+                container_client.delete_blob(blob.name, delete_snapshots="include")
+        return len(documents)
 
 
 def create_cosmos_structures(settings: Settings) -> None:
@@ -219,5 +299,7 @@ def create_cosmos_structures(settings: Settings) -> None:
 
 def create_blob_structures(settings: Settings) -> None:
     client = BlobServiceClient.from_connection_string(settings.azure_storage_connection_string)
-    for name in ("config-materials", "uploaded-documents", "extracted-texts", "generated-outputs"):
+    required = set(REQUIRED_BLOB_CONTAINERS)
+    required.add(settings.azure_search_knowledge_container)
+    for name in sorted(required):
         client.create_container(name) if not client.get_container_client(name).exists() else None

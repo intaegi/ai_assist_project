@@ -37,6 +37,22 @@ async def _store_file(request: Request, case_id: str, upload: UploadFile) -> Fil
         storage_path,
     )
     record.id = file_id
+    extracted_path = f"cases/{case_id}/text/{file_id}.json"
+    services.blob_store.upload(
+        "extracted-texts",
+        extracted_path,
+        json.dumps(
+            {
+                "case_id": case_id,
+                "file_id": file_id,
+                "file_name": file_name,
+                "pages": record.pages,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ).encode("utf-8"),
+        "application/json",
+    )
     return record
 
 
@@ -172,6 +188,14 @@ def delete_file(case_id: str, file_id: str, request: Request) -> dict:
     if not match:
         raise HTTPException(status_code=404, detail="ファイルが見つかりません。")
     request.app.state.services.blob_store.delete("uploaded-documents", match.storage_path)
+    try:
+        request.app.state.services.blob_store.delete(
+            "extracted-texts",
+            f"cases/{case_id}/text/{file_id}.json",
+        )
+    except Exception:
+        # Older cases may predate extracted-text persistence.
+        pass
     case.files = [item for item in case.files if item.id != file_id]
     case.updated_at = utc_now()
     request.app.state.services.data_store.save_case(case.model_dump(mode="json"))
@@ -210,7 +234,8 @@ def clone_case(case_id: str, request: Request) -> dict:
     clone.last_generated_at = None
     copied_files = []
     for file in source.files:
-        destination = f"cases/{new_id}/original/{file.id}_{file.file_name}"
+        new_file_id = f"file_{uuid4().hex[:12]}"
+        destination = f"cases/{new_id}/original/{new_file_id}_{file.file_name}"
         storage_path = services.blob_store.copy(
             "uploaded-documents",
             file.storage_path,
@@ -218,11 +243,27 @@ def clone_case(case_id: str, request: Request) -> dict:
             file.content_type,
         )
         copied = file.model_copy(deep=True)
-        copied.id = f"file_{uuid4().hex[:12]}"
+        copied.id = new_file_id
         copied.case_id = new_id
         copied.storage_path = storage_path
         copied.copied_from_case_id = source.case_id
         copied.requires_reconfirmation = True
+        services.blob_store.upload(
+            "extracted-texts",
+            f"cases/{new_id}/text/{new_file_id}.json",
+            json.dumps(
+                {
+                    "case_id": new_id,
+                    "file_id": new_file_id,
+                    "file_name": copied.file_name,
+                    "pages": copied.pages,
+                    "copied_from_case_id": source.case_id,
+                },
+                ensure_ascii=False,
+                indent=2,
+            ).encode("utf-8"),
+            "application/json",
+        )
         copied_files.append(copied)
     clone.files = copied_files
     services.data_store.save_case(clone.model_dump(mode="json"))

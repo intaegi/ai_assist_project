@@ -102,9 +102,9 @@
 | バックエンド | FastAPI | API、RAG処理、Azure連携、保存 |
 | 生成AI | Azure OpenAI Service | 要約、項目抽出、フォーム・チェックリスト生成 |
 | 検索/RAG | Azure AI Search | 規程、標準様式、必要書類基準、過去決裁検索 |
-| DB | Azure Cosmos DB | 案件、生成バージョン、チャット、履歴 |
+| アプリケーションデータ | ローカルJSON (`data/database.json`) | 案件、設定、生成バージョン、チャット、履歴 |
 | ファイル保存 | Azure Blob Storage | 原本、抽出テキスト、生成成果物 |
-| PDF処理 | PyMuPDF等 | ページ単位のテキスト抽出とプレビュー |
+| PDF処理 | pypdf / pypdfium2 | ページ単位のテキスト抽出と画像プレビュー |
 | 開発言語 | Python | Streamlit、FastAPI、Azure SDK |
 
 ### 2.2 使用予定Azureリソース
@@ -113,13 +113,12 @@
 |---|---|---|
 | リソースグループ | `20260526_forPBL` | 使用 |
 | Azure OpenAI | `20260526-forPBL-aoai` | Chat、項目抽出、Embedding |
-| Azure AI Search | `20260526forpblaisearch2` | 基準資料と過去決裁検索 |
-| Blob Storage | `lim` | 原本、抽出テキスト、成果物保存 |
-| Cosmos DB | `lim-pbl-decision-cosmos` 候補 | 権限と費用を確認して作成 |
+| Azure AI Search | サービス `20260526forpblaisearch2` / インデックス `lim-rag` | 基準資料と過去決裁検索 |
+| Blob Storage | Storage Account `20260526forpbl2850763855` | 原本、抽出テキスト、生成結果保存 |
+| Cosmos DB | 現在無効 (`AZURE_COSMOS_ENABLED=false`) | 現在の履歴と設定は`data/database.json`へ保存 |
 
-Storage Account名 `lim`は形式条件を満たすが、Azure全体で一意である必要がある。使用済みの場合は`lim`を含む一意な名前に変更する。
-
-Cosmos DBは本システムの作成履歴データベースとして使用する。新規作成権限と費用は実装前に確認する。
+現在のAzure設定ではOpenAI、AI Search、Blob Storageを使用し、Cosmos DBのみローカルJSONへ置き換える。
+キーと接続文字列は`.env`だけに保存し、仕様書やGitには記載しない。
 
 ### 2.3 RAG知識データ
 
@@ -147,14 +146,13 @@ flowchart LR
     Search["<b>Azure AI Search</b><br/>検索インデックス<br/>キーワード + ベクトル検索<br/>カテゴリ・決裁種類フィルタ<br/>規程・必要書類・類似決裁検索"]
     API["<b>FastAPI サーバー</b><br/>APIエンドポイント<br/>ファイル保存制御<br/>検索リクエスト<br/>業務ロジック・結果整形<br/>必須項目・必要書類検証"]
     AOAI["<b>Azure OpenAI Service</b><br/>文書要約<br/>項目抽出<br/>決裁フォーム生成<br/>追加チャット回答"]
-    Cosmos["<b>Azure Cosmos DB</b><br/>データベース<br/>案件・作成履歴<br/>チャット・バージョン<br/>チェックリスト・出典"]
+    Store["<b>アプリケーションデータストア</b><br/>現在: data/database.json<br/>案件・作成履歴<br/>チャット・バージョン<br/>チェックリスト・出典"]
     UI["<b>フロントエンド(Streamlit)</b><br/>初期設定<br/>新規作成・ファイルアップロード<br/>原本/フォーム比較<br/>追加チャット<br/>作成履歴・新規作成へコピー"]
     User["<b>利用者</b><br/>決裁申請者"]
 
-    Data -->|基準・サンプル原本アップロード| Blob
-    Blob -->|テキスト抽出対象| Prep
-    Prep -->|インデックス作成・更新| Search
-    Cosmos -. 最新作成履歴の再インデックス .-> Prep
+    Data -->|初期設定画面から登録| UI
+    API -->|基準資料テキスト抽出・整形| Prep
+    Prep -->|Embedding後にSDKで直接登録| Search
 
     User -->|カテゴリ・目的・添付書類| UI
     UI -->|リクエスト| API
@@ -163,8 +161,8 @@ flowchart LR
 
     API -->|原本ファイル保存| Blob
     Blob -->|原本・抽出テキスト取得| API
-    API -->|案件・チャット・バージョン保存| Cosmos
-    Cosmos -->|作成履歴・コピー元取得| API
+    API -->|案件・チャット・バージョン保存| Store
+    Store -->|作成履歴・コピー元取得| API
 
     API -->|検索クエリ| Search
     Search -->|基準・類似決裁| API
@@ -181,7 +179,7 @@ flowchart LR
     classDef user fill:#F5F6F8,stroke:#687386,stroke-width:2px,color:#2E3440;
 
     class Data source;
-    class Blob,Cosmos storage;
+    class Blob,Store storage;
     class Prep process;
     class Search search;
     class API backend;
@@ -189,12 +187,6 @@ flowchart LR
     class UI front;
     class User user;
 
-    linkStyle 0,1,2 stroke:#27964B,stroke-width:3px;
-    linkStyle 3 stroke:#4A90E2,stroke-width:2px,stroke-dasharray:6 4;
-    linkStyle 4,5,6,7 stroke:#2474CC,stroke-width:3px;
-    linkStyle 8,9,10,11 stroke:#333333,stroke-width:2px;
-    linkStyle 12,13 stroke:#2474CC,stroke-width:3px;
-    linkStyle 14,15 stroke:#F29A2E,stroke-width:3px;
 ```
 
 #### 色と矢印の意味
@@ -202,21 +194,26 @@ flowchart LR
 | 色 | 対象 | 意味 |
 |---|---|---|
 | 青 | 利用者・Streamlit・API・AI Search間 | オンラインのリクエスト／レスポンス |
-| 黒 | Blob Storage・Cosmos DB・文書処理 | 業務データの保存・取得・内部処理 |
+| 黒 | Blob Storage・ローカルJSON・文書処理 | 業務データの保存・取得・内部処理 |
 | 緑 | 初期登録資料・Blob Storage・前処理・AI Search | 事前取込・インデックス作成 |
 | オレンジ | FastAPIとAzure OpenAI間 | 検索結果を含む質問の送信・AI生成結果の受信 |
 
-RAGにおいて`Azure AI Search`は検索インデックスと関連情報検索を担当する。`Azure OpenAI Service`は検索結果と利用者入力を根拠に、要約、項目抽出、決裁フォーム生成を行う。`FastAPI`は両サービスを呼び出して結果を整形する制御役であるため、アーキテクチャ図では`RAG処理`を別領域として配置しない。
+RAGにおいて`Azure AI Search`は登録済みの基準資料と過去決裁の検索を担当する。
+`Azure OpenAI Service`は検索結果、利用者入力、現在の添付書類から抽出したテキストを根拠に生成する。
+`FastAPI`は文書抽出、検索知識JSONのBlob同期、検索、生成呼出しを制御する。
+Azureモードの既定構成はBlob Data source、Text Split/Azure OpenAI Embedding Skillset、
+Indexerを使用するIntegrated Vectorization方式とする。
 
 #### 発表資料での推奨レイアウト
 
 ```text
-上段: [初期登録資料] → [Blob Storage] → [データ前処理] → [Azure AI Search] → [FastAPI] ↔ [Azure OpenAI]
-中段: [FastAPI] ↔ [Azure Cosmos DB]
+上段: [初期登録資料] → [Streamlit] → [FastAPI] → [Blob Storage / データ前処理] → [Azure AI Search]
+中段: [FastAPI] ↔ [Azure OpenAI]、[FastAPI] ↔ [data/database.json]
 下段: [利用者] ↔ [フロントエンド(Streamlit)] ↔ [FastAPI]
 ```
 
-`初期登録資料`はデータベースではなく、Blob StorageとAI Searchへ登録する前の原本資料を意味する。実際の案件、作成履歴、チャット、バージョン、チェックリスト、出典を保存するデータベースは`Azure Cosmos DB`の1つとして定義する。
+`初期登録資料`はデータベースではなく、Blob StorageとAI Searchへ登録する前の原本資料を意味する。
+現在の実行設定では案件、作成履歴、チャット、バージョン、チェックリスト、出典を`data/database.json`へ保存する。
 
 オンライン処理と事前インデックス作成を同じ図で表現するが、発表時には青矢印を「利用時の流れ」、緑矢印を「事前準備の流れ」と説明する。
 
@@ -231,7 +228,7 @@ sequenceDiagram
     participant B as Blob Storage
     participant A as Azure AI Search
     participant O as Azure OpenAI
-    participant C as Cosmos DB
+    participant C as data/database.json
 
     Admin->>S: 初期設定入力・基準資料アップロード
     S->>F: /settings/requirements・/settings/materials
@@ -269,7 +266,7 @@ flowchart TD
     F --> G["入力 + 文書 + 基準 + 過去事例"]
     G --> H["Azure OpenAI生成"]
     H --> I["フォーム・不足警告・チェックリスト・出典"]
-    I --> J["Cosmos DB保存"]
+    I --> J["data/database.json保存"]
 
     K["UI-00初期設定資料<br/>規程・標準様式・必要書類基準"] --> L["チャンク分割"]
     P["サンプル過去決裁<br/>または最新作成履歴"] --> L
@@ -282,7 +279,7 @@ flowchart TD
 ### 3.4 サービス実行手順
 
 0. 設定担当者が初期設定画面で、カテゴリ別必須項目、必要書類、条件付き書類、標準様式、サンプル過去決裁を登録する
-1. システムが初期設定資料をBlob Storageへ保存し、構造化された基準設定をCosmos DBへ保存し、検索対象テキストをAzure AI Searchへインデックスする
+1. システムが初期設定資料をBlob Storageへ保存し、構造化された基準設定を`data/database.json`へ保存し、検索対象テキストをAzure AI Searchへ直接登録する
 2. `営業`、`経理・購買`、`開発・IT`、`その他`からカテゴリを選択する
 3. 決裁種類を選択する
 4. 初期設定に基づく必須記載内容、必要書類、条件付き書類を確認する
@@ -318,7 +315,10 @@ flowchart TD
 | UI-02 | AI生成結果確認 | 原本比較、フォーム修正、不足確認、自動保存 |
 | UI-03 | 作成履歴 | 履歴選択、詳細確認、新規作成へのコピー |
 
-現在の実装では画面を4つにする。一般利用者の主な流れはUI-01、UI-02、UI-03であり、UI-00は設定担当者が基準資料を登録するために使用する。要約、類似決裁、不足、チェックリスト、修正履歴はUI-02内のタブで表示する。
+現在の実装では画面を4つにする。一般利用者の主な流れはUI-01、UI-02、UI-03であり、
+UI-00は設定担当者が基準資料を登録するために使用する。UI-02の`要約`領域には生成内容、
+書類間の記載内容比較、不足・注意、チェックリスト、必要書類を連続表示する。
+類似決裁と修正履歴は、必要なときだけ開く`詳細情報`の展開領域に表示する。
 
 ### 4.2 画面遷移
 
@@ -361,10 +361,10 @@ flowchart LR
 
 | 設定項目 | 保存先 | 利用目的 |
 |---|---|---|
-| カテゴリ・決裁種類別必須入力項目 | Cosmos DB | 作成前準備事項とフォーム項目生成 |
-| 必要書類・条件付き書類基準 | Cosmos DB | 不足書類検証とチェックリスト生成 |
+| カテゴリ・決裁種類別必須入力項目 | `data/database.json` | 作成前準備事項とフォーム項目生成 |
+| 必要書類・条件付き書類基準 | `data/database.json` | 不足書類検証とチェックリスト生成 |
 | 標準様式・作成ガイド原本 | Blob Storage | 原本保管と検索インデックス |
-| サンプル過去決裁ファイル | Blob Storage / Cosmos DB | 類似決裁検索と履歴例 |
+| サンプル過去決裁ファイル | Blob Storage / `data/database.json` | 類似決裁検索と履歴例 |
 | 基準資料テキストチャンク | Azure AI Search | RAG検索根拠 |
 
 保存後、FastAPIは基準資料をテキスト抽出し、Azure AI Searchインデックスを更新する。カテゴリ別の構造化設定は`/requirements` APIで取得し、UI-01へ表示する。
@@ -501,14 +501,17 @@ flowchart LR
 │   SaaS利用料支払     │ ┌─────────────────────────┐ │ 取引先 [..............]  │
 │                      │ │ PDF・画像プレビュー     │ │ サービス [............]  │
 │ 現在の作成           │ └─────────────────────────┘ │ 期間 [................]  │
-│ CASE-...             │ 選択した根拠               │ 金額 [................]  │
-│                      │ invoice.pdf / 1ページ      │ 本文 [................]  │
-│                      │ 「合計金額 120,000円」     │ 各項目 [根拠を見る]      │
+│ CASE-...             │ [原本PDFを別タブで開く]    │ 金額 [................]  │
+│                      │                             │ 本文 [................]  │
+│                      │                             │ [フォーム内容をコピー]  │
 ├──────────────────────┴─────────────────────────────┴──────────────────────────┤
-│ [要約] [類似決裁] [不足・注意 2] [チェックリスト] [修正履歴]             │
-│ ⚠ 見積書を確認できません                   [追加] [該当なし]             │
-│ ⚠ サービス利用終了日を確認できません       [直接入力]                   │
-│ ✓ 請求金額とフォーム金額が一致しています                                │
+│ 要約                                                                     │
+│ 生成内容                                                                 │
+│ 書類間の記載内容比較: 項目 | フォーム値 | 書類 | 書類値 | 照合結果      │
+│ 不足・注意: ⚠ 見積書を確認できません                                    │
+│ チェックリスト: □ 要確認: 見積書をアップロードしてください              │
+│ 必要書類: 請求書、見積書                                                 │
+│ [詳細情報 ▾] 類似決裁・修正履歴                                         │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ AIへの修正依頼 [本文を3文以内にしてください.........................]    │
 │ 入力後Enterで最新案を更新します。                                      │
@@ -519,10 +522,10 @@ flowchart LR
 #### 原本比較
 
 - 左側にPDF・画像、右側に編集可能なフォームを表示する
-- `根拠を見る`で該当ファイルとページへ移動する
-- ファイル名、ページ、引用文、出典種類を表示する
-- 過去事例の根拠と現在添付書類の根拠を区別する
-- 現在の実装範囲では、ページ移動と引用文表示までを行う
+- `書類間の記載内容比較`でフォーム値と各書類の取引先、サービス名、金額、利用期間を比較する
+- 照合結果は`一致`、`記載なし`、`差異あり`、`フォーム未入力`で表示する
+- 複数書類の値が異なる場合は、Azure OpenAIの回答とは別にバックエンドで警告する
+- 類似決裁と修正履歴は`詳細情報`を開いた場合だけ表示する
 
 #### 追加チャット
 
@@ -690,7 +693,7 @@ flowchart LR
 4. 必須添付書類と条件付き添付書類を登録する
 5. 決裁規程、標準様式、作成ガイド、サンプル過去決裁ファイルをアップロードする
 6. FastAPIが原本ファイルをBlob Storageへ保存する
-7. FastAPIが構造化された必須項目・必要書類設定をCosmos DBへ保存する
+7. FastAPIが構造化された必須項目・必要書類設定を`data/database.json`へ保存する
 8. FastAPIが基準資料テキストを抽出し、Azure AI Searchインデックスを更新する
 9. 以降、利用者がUI-01で同じカテゴリと決裁種類を選択すると、その基準が作成前準備事項として表示される
 
@@ -804,9 +807,13 @@ StreamlitからFastAPIが稼働しているか確認する開発・運用用API�
 }
 ```
 
-`POST /settings/materials`は決裁規程、標準様式、作成ガイド、サンプル過去決裁ファイルをアップロードする。FastAPIはファイルをBlob Storageへ保存し、ファイルメタデータをCosmos DBへ保存する。
+`POST /settings/materials`は決裁規程、標準様式、作成ガイド、サンプル過去決裁ファイルをアップロードする。
+FastAPIはファイルをBlob Storageへ保存し、ファイルメタデータを`data/database.json`へ保存する。
 
-`POST /settings/reindex`はBlob Storage上の基準資料とサンプル過去決裁をテキスト化し、Azure AI Searchインデックスを更新する。
+`POST /settings/reindex`は登録済みの基準資料とサンプル過去決裁を共通文書形式へ正規化し、
+`search-knowledge/documents/`へJSONとして同期した後、Indexerを即時実行する。
+IndexerはSkillsetのText SplitとAzure OpenAI Embeddingを適用し、チャンク単位でSearchへ投影する。
+`AZURE_SEARCH_INGESTION_MODE=direct`は障害対応と旧構成互換用の選択肢として残す。
 
 ### 6.4 `/requirements`
 
@@ -942,16 +949,18 @@ StreamlitからFastAPIが稼働しているか確認する開発・運用用API�
 
 ## 7. データ設計
 
-### 7.1 Cosmos DB
+### 7.1 アプリケーションデータ保存構造
 
-現在の実装では物理コンテナを2つにする。
+現在は`AZURE_COSMOS_ENABLED=false`のため、`LocalDataStore`が`data/database.json`へ保存する。
 
-| コンテナ | 保存対象 | パーティションキー |
-|---|---|---|
-| `decision-data` | 案件、バージョン、チャット、初期基準設定 | `/case_id` または `/config_id` |
-| `past-decisions` | RAG用過去決裁 | `/business_category` |
+| 最上位キー | 保存対象 |
+|---|---|
+| `cases` | 案件、生成バージョン、チャット、検証結果 |
+| `requirements` | カテゴリ・決裁種類別の必須入力と必要書類基準 |
+| `materials` | Blob Storageへ保存した基準資料のメタデータと抽出テキスト |
+| `past_decisions` | RAG検索用サンプル過去決裁 |
 
-`decision-data`では`document_type`を`case`、`version`、`chat`、`requirement_config`、`material`で区別する。案件文書は`case_id`をパーティションキーにし、初期基準設定文書は`config_id`をパーティションキーにする。
+更新時は一時JSONを書き込んでから置き換え、中間破損を防ぐ。
 
 #### `cases`
 
@@ -1005,16 +1014,16 @@ StreamlitからFastAPIが稼働しているか確認する開発・運用用API�
 
 | コンテナ | 用途 | 例 |
 |---|---|---|
-| `config-materials` | 初期設定基準資料の原本 | `settings/{business_category}/{approval_type}/{file_name}` |
-| `uploaded-documents` | 原本 | `cases/{case_id}/original/{file_name}` |
+| `config-materials` | 初期設定基準資料の原本 | `settings/{business_category}/{approval_type}/{material_id}/{file_name}` |
+| `uploaded-documents` | 原本 | `cases/{case_id}/original/{file_id}_{file_name}` |
 | `extracted-texts` | ページ付き抽出JSON | `cases/{case_id}/text/{file_id}.json` |
-| `generated-outputs` | 成果物 | `cases/{case_id}/output/form.md` |
+| `generated-outputs` | AI生成・再生成のバージョン結果 | `cases/{case_id}/versions/{version}.json` |
 
 コピー添付には`copied_from_case_id`、`copied_from_file_id`、`requires_reconfirmation`を保存する。コピー側の変更は過去履歴原本へ影響させない。
 
 ### 7.3 Azure AI Searchインデックス
 
-インデックス名: `decision-cases-index`
+インデックス名: `.env`の`AZURE_SEARCH_INDEX_NAME`。現在の設定例は`lim-rag`
 
 主なフィールド:
 
@@ -1285,15 +1294,15 @@ workspace/
 1. 3基本カテゴリとその他の共通・追加項目、基準資料、サンプル決裁形式を確定する
 2. StreamlitでUI-00初期設定画面を作る
 3. FastAPIで`/settings/requirements`、`/settings/materials`、`/settings/reindex`を実装する
-4. 初期設定資料をBlob StorageとCosmos DBへ保存し、Azure AI Searchインデックスを更新する
+4. 初期設定資料をBlob Storageと`data/database.json`へ保存し、Azure AI Searchインデックスを更新する
 5. StreamlitでUI-01新規作成画面を作る
 6. FastAPIで`/health`、`/cases`、`/generate` APIを作る
-7. Blob Storage `lim`へ利用者アップロードファイルを保存し、原本プレビューを表示する
+7. 設定したStorage Accountの`uploaded-documents`へ利用者ファイルを保存し、原本プレビューを表示する
 8. PDFページ単位のテキスト抽出と出典データ形式を実装する
 9. Azure OpenAIで文書要約と項目抽出を実装する
 10. Azure AI Searchハイブリッド検索とRAGプロンプトを実装する
 11. UI-02へ原本と結果の左右比較、追加修正チャットを実装する
-12. Cosmos DBへ案件、バージョン、チャット、出典を保存する
+12. `data/database.json`へ案件、バージョン、チャット、出典を保存する
 13. UI-03の履歴表示とコピー機能を実装する
 14. デモシナリオとエラーケースをテストする
 
@@ -1349,13 +1358,14 @@ workspace/
 ## 13. 実装完了基準
 
 - 設定担当者が初期設定画面でカテゴリ別必須入力項目と必要書類基準を登録できる
-- 初期設定資料をBlob Storage、Cosmos DB、Azure AI Searchへ用途別に保存・反映できる
+- 初期設定原本をBlob Storage、メタデータを`data/database.json`、検索文書をAzure AI Searchへ保存・反映できる
 - 3基本カテゴリまたはその他を選択できる
 - 作成前準備事項を表示できる
 - PDFをBlob Storageへ保存できる
 - 取引先、サービス、期間、金額、日付のうち3項目以上を抽出できる
 - 基準資料と類似決裁を検索できる
 - フォーム、不足警告、チェックリストを生成できる
+- 複数書類の金額、取引先、サービス名、利用期間の不一致を警告とチェックリストへ表示できる
 - ファイル名、ページ、引用文を確認できる
 - 追加チャットで修正できる
 - AI生成、直接修正、追加チャット後に最新内容を自動保存できる
@@ -1372,7 +1382,9 @@ workspace/
 | RAG知識 | 規程・標準様式・必要書類を優先、過去事例は補助 |
 | 類似事例なし | 基準資料と現在文書で作成 |
 | 作成前案内 | 必須記載・必要書類・条件付き書類 |
-| 初期設定保存 | 構造化基準設定はCosmos DB、原本資料はBlob Storage、検索用テキストはAzure AI Searchへ保存 |
+| 初期設定保存 | 構造化基準設定は`data/database.json`、原本はBlob Storage、検索文書はAzure AI Searchへ保存 |
+| 書類不一致 | 金額、取引先、サービス名、利用期間をサーバーで比較し、警告とチェックリストへ反映 |
+| Search登録 | Blob Data source、Text Split/Embedding Skillset、Indexerを使用。Direct SDKは互換オプション |
 | 根拠 | ファイル、ページ、引用文 |
 | 保存方式 | AI生成・直接修正・追加チャット後に自動保存 |
 | 承認状態 | 既存の社内決裁システム側で管理 |
@@ -1386,11 +1398,14 @@ workspace/
 4. 3基本カテゴリが対象組織に適しているか
 5. 決裁番号を利用者が入力するか、AI抽出候補として扱うか
 6. Azure OpenAIのChat・Embeddingデプロイ名
-7. Cosmos DB作成権限と予算
+7. デモ履歴をローカルJSONで運用する条件が適切か
 
 ## 16. 発表用まとめ
 
-本システムは、決裁規程、必要書類基準、標準様式、過去の類似決裁をRAGで検索し、アップロード書類から取引先、製品・サービス、期間、金額等を抽出して、決裁フォーム案、不足警告、チェックリストを生成する業務支援アプリケーションである。設定担当者は最初に決裁規程、標準様式、必要書類基準、カテゴリ別入力項目を初期設定として登録する。
+本システムはStreamlitとFastAPIにAzure OpenAI Service、Azure AI Search、Azure Blob Storage、
+ローカルJSON履歴ストアを組み合わせた決裁書類作成支援アプリケーションである。
+決裁規程、必要書類基準、標準様式、過去の類似決裁をRAGで検索し、アップロード書類から
+取引先、製品・サービス、期間、金額等を抽出して、決裁フォーム案、不足警告、チェックリストを生成する。
 
 利用者は原本書類と生成結果を同一画面で比較し、追加チャットで修正できる。作成結果は履歴として保存され、過去フォームと添付書類を新しい案件へコピーして再利用できる。
 
@@ -1400,4 +1415,3 @@ workspace/
 - [Azure AI Search ベクトル検索フィルター](https://learn.microsoft.com/en-us/azure/search/vector-search-filters)
 - [Azure OpenAI Structured Outputs](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs)
 - [Azure Storage Account作成](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-create)
-- [Azure Cosmos DB Free Tier](https://learn.microsoft.com/en-us/azure/cosmos-db/free-tier)

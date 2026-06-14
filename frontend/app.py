@@ -25,8 +25,32 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-      .block-container { padding-top: 1.5rem; padding-bottom: 3rem; max-width: 1500px; }
+      .block-container { padding-top: 3.75rem; padding-bottom: 3rem; max-width: 1500px; }
       [data-testid="stSidebar"] { border-right: 1px solid #d9dee7; }
+      [data-stale="true"] { opacity: 1 !important; }
+      .history-item {
+        display: block;
+        color: inherit !important;
+        text-decoration: none !important;
+        padding: 0.65rem 0.75rem;
+        margin: 0.2rem 0;
+        border-left: 3px solid transparent;
+        background: transparent;
+      }
+      .history-item:hover { background: #e8f1f8; }
+      .history-item.active { background: #dcecf8; border-left-color: #1769aa; }
+      .history-title {
+        display: block;
+        line-height: 1.35;
+        overflow-wrap: anywhere;
+      }
+      .history-time {
+        display: block;
+        margin-top: 0.3rem;
+        color: #667085;
+        font-size: 0.75rem;
+        text-align: right;
+      }
       h1 { font-size: 1.75rem !important; letter-spacing: 0; }
       h2, h3 { letter-spacing: 0; }
       div[data-testid="stForm"] { border: 0; padding: 0; }
@@ -37,12 +61,14 @@ st.markdown(
 )
 
 client = ApiClient()
-try:
-    client.health()
-except ApiError as exc:
-    st.error(str(exc))
-    st.code("uvicorn backend.app.main:app --reload --port 8000")
-    st.stop()
+if not st.session_state.get("backend_health_checked"):
+    try:
+        client.health()
+        st.session_state.backend_health_checked = True
+    except ApiError as exc:
+        st.error(str(exc))
+        st.code("uvicorn backend.app.main:app --reload --port 8000")
+        st.stop()
 
 page, case_id = render_sidebar(client, st.session_state.get("case_id"))
 

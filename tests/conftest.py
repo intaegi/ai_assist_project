@@ -1,5 +1,10 @@
+import os
+
 import pytest
 from fastapi.testclient import TestClient
+
+# Tests must not depend on the developer's Azure-enabled .env file.
+os.environ["APP_STORAGE_MODE"] = "local"
 
 from backend.app.core.config import Settings
 from backend.app.main import create_app

@@ -104,9 +104,9 @@
 | 백엔드 | FastAPI | API, RAG 처리, Azure 연동, 데이터 저장 |
 | 생성AI | Azure OpenAI Service | 요약, 항목 추출, 체크리스트 생성, 폼 생성 |
 | 검색/RAG | Azure AI Search | 결재 규정, 표준 양식, 필수서류 기준, 과거 결재의 검색 |
-| DB | Azure Cosmos DB | 결재 안건 메타데이터, 생성 결과, 이력, 사용자 로그 |
+| 애플리케이션 데이터 | 로컬 JSON (`data/database.json`) | 결재 안건, 설정, 기준 자료 메타데이터, 생성 이력 |
 | 파일 저장 | Azure Blob Storage | 업로드 문서, 추출 텍스트, 생성 결과물 |
-| 문서 추출 | PyMuPDF 등 Python PDF 라이브러리 | 페이지별 텍스트 추출과 PDF 미리보기 |
+| 문서 추출 | pypdf / pypdfium2 | 페이지별 텍스트 추출과 PDF 이미지 미리보기 |
 | 개발 언어 | Python | Streamlit, FastAPI, Azure SDK |
 
 ### 2.2 사용 예정 Azure 리소스
@@ -115,13 +115,12 @@
 |---|---|---|
 | 리소스 그룹 | `20260526_forPBL` | 사용 |
 | Azure OpenAI | `20260526-forPBL-aoai` | 채팅, 요약, 항목 추출, Embedding 생성 |
-| Azure AI Search | `20260526forpblaisearch2` | 기준 자료, 과거 결재, 문서 청크 검색 |
-| Blob Storage | `lim` | 업로드 원본, 추출 텍스트, 생성 결과 저장. Azure 전체에서 이름 사용 가능 여부 확인 |
-| Cosmos DB | `lim-pbl-decision-cosmos` 후보 | 이력 저장을 위해 신규 생성 여부를 비용과 권한에 따라 결정 |
+| Azure AI Search | 서비스 `20260526forpblaisearch2` / 인덱스 `lim-rag` | 기준 자료와 과거 결재 검색 |
+| Blob Storage | Storage Account `20260526forpbl2850763855` | 원본, 추출 텍스트, 생성 결과 저장 |
+| Cosmos DB | 현재 비활성 (`AZURE_COSMOS_ENABLED=false`) | 현재 이력과 설정은 `data/database.json`에 저장 |
 
-> Storage Account 이름 `lim`은 소문자 3자로 형식 조건은 충족하지만 Azure 전체에서 고유해야 한다. 이미 사용 중이면 `lim`을 포함한 고유 이름으로 변경한다.
-
-> Cosmos DB는 본 시스템의 작성 이력 데이터베이스로 사용한다. 신규 생성 권한과 예산은 구현 전에 확인한다.
+현재 Azure 설정은 OpenAI, AI Search, Blob Storage를 사용하고 Cosmos DB만 로컬 JSON으로 대체한다.
+키와 연결 문자열은 `.env`에만 저장하며 사양서와 Git에는 기록하지 않는다.
 
 ### 2.3 RAG 지식 데이터 구성
 
@@ -149,14 +148,13 @@ flowchart LR
     Search["<b>Azure AI Search</b><br/>검색 인덱스<br/>키워드 + 벡터 검색<br/>카테고리・결재 종류 필터<br/>규정・필요서류・유사 결재 검색"]
     API["<b>FastAPI 서버</b><br/>API 엔드포인트<br/>파일 저장 제어<br/>검색 요청<br/>업무 로직・결과 정형화<br/>필수항목・필요서류 검증"]
     AOAI["<b>Azure OpenAI Service</b><br/>문서 요약<br/>항목 추출<br/>결재 폼 생성<br/>추가 채팅 응답"]
-    Cosmos["<b>Azure Cosmos DB</b><br/>데이터베이스<br/>안건・작성 이력<br/>채팅・버전<br/>체크리스트・출처"]
+    Store["<b>애플리케이션 데이터 저장소</b><br/>현재: data/database.json<br/>안건・작성 이력<br/>채팅・버전<br/>체크리스트・출처"]
     UI["<b>프론트엔드(Streamlit)</b><br/>초기 설정<br/>신규 작성・파일 업로드<br/>원본/폼 비교<br/>추가 채팅<br/>작성 이력・신규 작성으로 복사"]
     User["<b>사용자</b><br/>결재 신청자"]
 
-    Data -->|기준・샘플 원본 업로드| Blob
-    Blob -->|텍스트 추출 대상| Prep
-    Prep -->|인덱스 생성・갱신| Search
-    Cosmos -. 최신 작성 이력 재인덱싱 .-> Prep
+    Data -->|초기 설정 화면에서 등록| UI
+    API -->|기준 자료 텍스트 추출・정형화| Prep
+    Prep -->|Embedding 후 SDK 직접 업로드| Search
 
     User -->|카테고리・목적・첨부문서| UI
     UI -->|리퀘스트| API
@@ -165,8 +163,8 @@ flowchart LR
 
     API -->|원본 파일 저장| Blob
     Blob -->|원본・추출 텍스트 조회| API
-    API -->|안건・채팅・버전 저장| Cosmos
-    Cosmos -->|작성 이력・복사 원본 조회| API
+    API -->|안건・채팅・버전 저장| Store
+    Store -->|작성 이력・복사 원본 조회| API
 
     API -->|검색 쿼리| Search
     Search -->|기준・유사 결재| API
@@ -183,7 +181,7 @@ flowchart LR
     classDef user fill:#F5F6F8,stroke:#687386,stroke-width:2px,color:#2E3440;
 
     class Data source;
-    class Blob,Cosmos storage;
+    class Blob,Store storage;
     class Prep process;
     class Search search;
     class API backend;
@@ -191,12 +189,6 @@ flowchart LR
     class UI front;
     class User user;
 
-    linkStyle 0,1,2 stroke:#27964B,stroke-width:3px;
-    linkStyle 3 stroke:#4A90E2,stroke-width:2px,stroke-dasharray:6 4;
-    linkStyle 4,5,6,7 stroke:#2474CC,stroke-width:3px;
-    linkStyle 8,9,10,11 stroke:#333333,stroke-width:2px;
-    linkStyle 12,13 stroke:#2474CC,stroke-width:3px;
-    linkStyle 14,15 stroke:#F29A2E,stroke-width:3px;
 ```
 
 #### 색상과 화살표 의미
@@ -204,21 +196,26 @@ flowchart LR
 | 색상 | 대상 | 의미 |
 |---|---|---|
 | 파란색 | 사용자・Streamlit・API・AI Search 사이 | 온라인 요청・응답 |
-| 검은색 | Blob Storage・Cosmos DB・문서 처리 | 업무 데이터 저장・조회・내부 처리 |
+| 검은색 | Blob Storage・로컬 JSON 데이터 저장소・문서 처리 | 업무 데이터 저장・조회・내부 처리 |
 | 녹색 | 초기 등록 자료・Blob Storage・전처리・AI Search | 사전 수집・인덱스 생성 |
 | 주황색 | FastAPI와 Azure OpenAI 사이 | 검색 결과를 포함한 질문 전달・AI 생성 결과 수신 |
 
-RAG에서 `Azure AI Search`는 검색 인덱스와 관련 정보 검색을 담당한다. `Azure OpenAI Service`는 검색 결과와 사용자 입력을 근거로 요약, 항목 추출, 결재 폼 생성을 수행한다. `FastAPI`는 두 서비스를 호출하고 결과를 정형화하는 흐름 제어 역할이므로, 아키텍처도에는 `RAG 처리`를 별도 영역으로 두지 않는다.
+RAG에서 `Azure AI Search`는 이미 등록된 기준 자료와 과거 결재의 검색을 담당한다. `Azure OpenAI Service`는
+검색 결과와 사용자 입력, 현재 첨부문서의 추출 텍스트를 근거로 요약과 결재 폼 생성을 수행한다.
+`FastAPI`는 문서 추출, 검색 지식 JSON의 Blob 동기화, 검색과 생성 호출을 제어한다.
+Azure 모드의 기본 구성은 Blob Data source, Text Split/Azure OpenAI Embedding Skillset,
+Indexer를 사용하는 integrated vectorization 방식이다.
 
 #### 발표 자료 권장 레이아웃
 
 ```text
-상단: [초기 등록 자료] → [Blob Storage] → [데이터 전처리] → [Azure AI Search] → [FastAPI] ↔ [Azure OpenAI]
-중단: [FastAPI] ↔ [Azure Cosmos DB]
+상단: [초기 등록 자료] → [Streamlit] → [FastAPI] → [Blob Storage / 데이터 전처리] → [Azure AI Search]
+중단: [FastAPI] ↔ [Azure OpenAI], [FastAPI] ↔ [data/database.json]
 하단: [사용자] ↔ [프론트엔드(Streamlit)] ↔ [FastAPI]
 ```
 
-`초기 등록 자료`는 데이터베이스가 아니라 Blob Storage와 AI Search에 넣기 전의 원본 자료를 의미한다. 실제 안건, 작성 이력, 채팅, 버전, 체크리스트, 출처를 저장하는 데이터베이스는 `Azure Cosmos DB` 하나로 정의한다.
+`초기 등록 자료`는 데이터베이스가 아니라 Blob Storage와 AI Search에 넣기 전의 원본 자료를 의미한다.
+현재 실행 설정에서 실제 안건, 작성 이력, 채팅, 버전, 체크리스트, 출처는 `data/database.json`에 저장한다.
 
 한 그림에 온라인 처리와 사전 인덱스 생성을 함께 표시한다. 발표 시 파란 화살표는 `서비스 이용 시 흐름`, 녹색 화살표는 `사전 데이터 준비 흐름`으로 설명한다.
 
@@ -231,7 +228,7 @@ sequenceDiagram
     participant S as Streamlit
     participant F as FastAPI
     participant B as Blob Storage
-    participant C as Cosmos DB
+    participant C as data/database.json
     participant A as Azure AI Search
     participant O as Azure OpenAI
 
@@ -271,7 +268,7 @@ flowchart TD
     I --> J["프롬프트 조립<br/>입력 + 문서 + 기준 + 과거 사례"]
     J --> K["Azure OpenAI로 생성"]
     K --> L["출력<br/>폼 초안・요약・체크리스트・출처"]
-    L --> M["Cosmos DB 저장"]
+    L --> M["data/database.json 저장"]
 
     R["UI-00 초기 설정 자료<br/>결재 규정・표준 양식<br/>필요서류 기준표"] --> D["청크 분할"]
     P["샘플 과거 결재<br/>또는 최신 작성 이력"] --> D
@@ -284,7 +281,7 @@ flowchart TD
 ### 3.4 확정한 서비스 실행 순서
 
 0. 설정 담당자가 초기 설정 화면에서 카테고리별 필수 입력항목, 필요서류, 조건부 서류, 표준 양식, 샘플 과거 결재를 등록한다
-1. 시스템이 초기 설정 자료를 Blob Storage에 저장하고, 구조화된 기준 설정은 Cosmos DB에 저장하며, 검색 대상 텍스트는 Azure AI Search에 인덱싱한다
+1. 시스템이 초기 설정 자료를 Blob Storage에 저장하고, 구조화된 기준 설정은 `data/database.json`에 저장하며, 검색 대상 텍스트는 Azure AI Search에 직접 인덱싱한다
 2. 사용자가 초기 화면에서 `영업`, `경리・구매`, `개발・IT`, `기타` 중 업무 카테고리를 선택한다
 3. 선택한 카테고리에 맞는 입력항목과 필요서류가 표시된다
 4. 사용자가 채팅란에 결재 목적과 보충 설명을 입력하고 관련 문서를 업로드한다
@@ -319,7 +316,10 @@ flowchart TD
 | UI-02 | AI 생성 결과 검토 | 원본과 생성 폼 비교, 체크리스트, 추가 채팅 수정, 저장 |
 | UI-03 | 결재 이력 | 저장된 안건 검색, 상세 확인, 과거 안건 복제 |
 
-현재 구현에서는 화면을 4개로 구성한다. 일반 결재 신청자의 주요 흐름은 UI-01, UI-02, UI-03이며, UI-00은 설정 담당자가 기준 자료를 등록할 때 사용한다. 요약, 유사 결재, 폼, 체크리스트는 별도 페이지가 아니라 UI-02 안의 탭과 패널로 제공한다.
+현재 구현에서는 화면을 4개로 구성한다. 일반 결재 신청자의 주요 흐름은 UI-01, UI-02, UI-03이며,
+UI-00은 설정 담당자가 기준 자료를 등록할 때 사용한다. UI-02의 `요약` 영역에는 생성 요약,
+문서 간 기재내용 비교표, 누락·주의, 체크리스트, 필요서류를 연속해서 표시한다.
+유사 결재와 수정 이력은 일반 사용자가 필요할 때만 여는 `상세정보` 확장 영역에 표시한다.
 
 ### 4.2 화면 전이도
 
@@ -369,10 +369,10 @@ flowchart LR
 
 | 설정 항목 | 저장 위치 | 사용 목적 |
 |---|---|---|
-| 카테고리・결재 종류별 필수 입력항목 | Cosmos DB | 작성 전 준비사항과 폼 항목 생성 |
-| 필요서류・조건부 서류 기준 | Cosmos DB | 누락 서류 검증과 체크리스트 생성 |
+| 카테고리・결재 종류별 필수 입력항목 | `data/database.json` | 작성 전 준비사항과 폼 항목 생성 |
+| 필요서류・조건부 서류 기준 | `data/database.json` | 누락 서류 검증과 체크리스트 생성 |
 | 표준 양식・작성 가이드 원본 | Blob Storage | 원본 보관과 검색 인덱싱 |
-| 샘플 과거 결재 파일 | Blob Storage / Cosmos DB | 유사 결재 검색과 이력 예시 |
+| 샘플 과거 결재 파일 | Blob Storage / `data/database.json` | 유사 결재 검색과 이력 예시 |
 | 기준 자료 텍스트 청크 | Azure AI Search | RAG 검색 근거 |
 
 저장 후 FastAPI는 기준 자료를 텍스트로 추출하고 Azure AI Search 인덱스를 갱신한다. 카테고리별 구조화 설정은 `/requirements` API에서 조회되어 UI-01에 표시된다.
@@ -538,14 +538,16 @@ flowchart LR
 │   태블릿 구매        │ │ PDF・이미지 미리보기    │ │ 서비스 [.............]   │
 │ 현재 초안            │ │                         │ │ 기간 [...............]   │
 │ CASE-...             │ └─────────────────────────┘ │ 금액 [...............]   │
-│                      │ 선택 근거                   │ 본문 [...............]   │
-│                      │ invoice.pdf / 1페이지      │ 각 항목 [근거 보기]      │
-│                      │ "합계금액 120,000원"       │                          │
+│                      │ [원본 PDF 새 탭에서 열기]  │ 본문 [...............]   │
+│                      │                             │ [폼 내용 복사]           │
 ├──────────────────────┴─────────────────────────────┴──────────────────────────┤
-│ [요약] [유사 결재] [누락・주의 2] [체크리스트] [수정 이력]                │
-│ ⚠ 견적서가 확인되지 않았습니다              [파일 추가] [해당 없음]       │
-│ ⚠ 서비스 이용 종료일이 확인되지 않았습니다  [직접 입력]                   │
-│ ✓ 청구 금액과 폼 금액이 일치합니다                                        │
+│ 요약                                                                     │
+│ 생성 내용                                                               │
+│ 서류 간 기재내용 비교: 항목 | 폼 값 | 서류 | 서류 값 | 일치 여부        │
+│ 누락・주의: ⚠ 견적서가 확인되지 않았습니다                               │
+│ 체크리스트: □ 要確認: 견적서를 업로드してください                        │
+│ 필요서류: 청구서, 견적서                                                 │
+│ [상세정보 ▾] 유사 결재・수정 이력                                       │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │ AI 수정 요청                                                              │
 │ [본문을 승인자용으로 3문장 이내로 줄여 주세요.........................]   │
@@ -558,10 +560,10 @@ flowchart LR
 
 - 왼쪽에는 업로드한 PDF 또는 이미지를 표시한다
 - 오른쪽에는 사용자가 직접 수정 가능한 생성 폼을 표시한다
-- 폼 항목 옆의 `근거 보기`를 누르면 왼쪽 문서가 해당 파일과 페이지로 이동한다
-- 근거 패널에는 `파일명`, `페이지`, `원문 인용`, `출처 종류`를 표시한다
-- 과거 결재를 참고한 항목은 첨부문서 근거와 구분하여 `과거 결재 참고`로 표시한다
-- 한 필드에 복수 근거가 있으면 목록으로 표시한다
+- `서류 간 기재내용 비교` 표에서 폼 값과 각 문서의 거래처, 서비스명, 금액, 이용 기간을 비교한다
+- 비교 결과는 `일치`, `기재 없음`, `차이 있음`, `폼 미입력`으로 표시한다
+- 복수 문서의 값이 다르면 백엔드가 AI 응답과 별도로 경고를 생성한다
+- 과거 결재와 수정 이력은 `상세정보`를 열었을 때만 표시한다
 
 #### 근거 표시 수준
 
@@ -741,7 +743,7 @@ flowchart LR
 4. 필수 첨부서류와 조건부 첨부서류를 등록한다
 5. 결재 규정, 표준 양식, 작성 가이드, 샘플 과거 결재 파일을 업로드한다
 6. FastAPI가 원본 파일을 Blob Storage에 저장한다
-7. FastAPI가 구조화된 필수항목・필요서류 설정을 Cosmos DB에 저장한다
+7. FastAPI가 구조화된 필수항목・필요서류 설정을 `data/database.json`에 저장한다
 8. FastAPI가 기준 자료 텍스트를 추출하고 Azure AI Search 인덱스를 갱신한다
 9. 이후 사용자가 UI-01에서 같은 카테고리와 결재 종류를 선택하면 해당 기준이 작성 전 준비사항으로 표시된다
 
@@ -762,7 +764,7 @@ flowchart LR
 
 #### UC-02 유사 결재를 확인한다
 
-1. 사용자가 생성 결과 화면에서 「유사 결재」 탭을 연다
+1. 사용자가 생성 결과 화면의 `상세정보` 확장 영역을 연다
 2. 시스템이 유사도순으로 과거 안건을 표시한다
 3. 각 결과에는 유사 이유, 카테고리, 결재 종류, 과목번호, 금액대, 검색 점수를 표시한다
 4. 사용자가 참조할 안건을 선택한다
@@ -952,9 +954,13 @@ AI가 추출하지 못한 값과 실제로 문서에 없는 값은 기술적으�
 }
 ```
 
-`POST /settings/materials`는 결재 규정, 표준 양식, 작성 가이드, 샘플 과거 결재 파일을 업로드한다. FastAPI는 파일을 Blob Storage에 저장하고, 파일 메타데이터를 Cosmos DB에 저장한다.
+`POST /settings/materials`는 결재 규정, 표준 양식, 작성 가이드, 샘플 과거 결재 파일을 업로드한다.
+FastAPI는 파일을 Blob Storage에 저장하고, 파일 메타데이터를 `data/database.json`에 저장한다.
 
-`POST /settings/reindex`는 Blob Storage에 저장된 기준 자료와 샘플 과거 결재를 텍스트로 추출하여 Azure AI Search 인덱스를 갱신한다.
+`POST /settings/reindex`는 애플리케이션 데이터 저장소에 등록된 기준 자료와 샘플 과거 결재를
+공통 문서 구조로 정규화하고 `search-knowledge/documents/`에 JSON으로 동기화한 뒤 Indexer를 즉시 실행한다.
+Indexer는 Skillset의 Text Split과 Azure OpenAI Embedding을 적용하고 chunk 단위로 Search 인덱스에 투영한다.
+`AZURE_SEARCH_INGESTION_MODE=direct`는 장애 대응과 이전 구성 호환을 위한 선택 옵션이다.
 
 ### 6.4 `GET /requirements` 응답
 
@@ -1120,16 +1126,18 @@ AI가 추출하지 못한 값과 실제로 문서에 없는 값은 기술적으�
 
 ## 7. 데이터 설계
 
-### 7.1 Cosmos DB 컨테이너 설계
+### 7.1 애플리케이션 데이터 저장 구조
 
-아래의 `cases`, `chat_logs`, `case_versions`, `past_decisions`는 논리 데이터 종류를 의미한다. 현재 구현에서는 물리 컨테이너를 다음 2개로 단순화한다.
+현재 실행 설정은 `AZURE_COSMOS_ENABLED=false`이므로 `LocalDataStore`가 `data/database.json` 한 파일에 저장한다.
 
-| 물리 컨테이너 | 저장 대상 | 파티션 키 |
-|---|---|---|
-| `decision-data` | 안건, 생성 버전, 채팅 로그, 초기 기준 설정 | `/case_id` 또는 `/config_id` |
-| `past-decisions` | RAG 검색용 과거 결재 | `/business_category` |
+| 최상위 키 | 저장 대상 |
+|---|---|
+| `cases` | 안건, 생성 버전, 채팅 로그, 검증 결과 |
+| `requirements` | 카테고리·결재 종류별 필수 입력과 필요서류 기준 |
+| `materials` | Blob Storage에 저장한 기준 자료의 메타데이터와 추출 텍스트 |
+| `past_decisions` | RAG 검색용 샘플 과거 결재 |
 
-`decision-data` 안에서는 `document_type` 값을 `case`, `version`, `chat`, `requirement_config`, `material`로 구분한다. 안건 본문 문서는 `case_id`에 자신의 `id`와 같은 값을 저장한다. 초기 기준 설정 문서는 `config_id`를 파티션 키로 사용한다.
+파일 갱신은 임시 JSON을 작성한 뒤 교체하는 방식으로 중간 손상을 줄인다.
 
 #### `cases`
 
@@ -1214,7 +1222,9 @@ AI가 추출하지 못한 값과 실제로 문서에 없는 값은 기술적으�
 
 #### 기준 자료
 
-결재 규정, 표준 양식, 필요서류 기준표는 UI-00 초기 설정 화면에서 등록한다. 원본 파일은 Blob Storage에 저장하고, 카테고리・결재 종류별 구조화 설정은 Cosmos DB에 저장하며, 검색에 사용할 텍스트 청크는 Azure AI Search에 인덱싱한다.
+결재 규정, 표준 양식, 필요서류 기준표는 UI-00 초기 설정 화면에서 등록한다.
+원본 파일은 Blob Storage에 저장하고, 카테고리·결재 종류별 구조화 설정은 `data/database.json`에 저장한다.
+검색용 텍스트와 Embedding은 FastAPI가 Azure AI Search에 직접 등록한다.
 
 #### `requirement_config`
 
@@ -1263,12 +1273,16 @@ AI가 추출하지 못한 값과 실제로 문서에 없는 값은 기술적으�
 
 | 컨테이너명 | 용도 | 경로 예 |
 |---|---|---|
-| `config-materials` | 초기 설정 기준 자료 원본 | `settings/{business_category}/{approval_type}/{file_name}` |
-| `uploaded-documents` | 업로드 원본 | `cases/{case_id}/original/{file_name}` |
+| `config-materials` | 초기 설정 기준 자료 원본 | `settings/{business_category}/{approval_type}/{material_id}/{file_name}` |
+| `uploaded-documents` | 업로드 원본 | `cases/{case_id}/original/{file_id}_{file_name}` |
 | `extracted-texts` | 페이지 정보가 포함된 추출 텍스트 | `cases/{case_id}/text/{file_id}.json` |
-| `generated-outputs` | 생성 완료 결과 | `cases/{case_id}/output/form.md` |
+| `generated-outputs` | AI 생성·재생성 버전 결과 | `cases/{case_id}/versions/{version}.json` |
+| `search-knowledge` | Data source가 읽는 정규화된 RAG 지식 JSON | `documents/{sha256(id)}.json` |
 
 추출 텍스트 JSON에는 `file_id`, `page`, `text`를 저장한다.
+
+Blob Storage 계정은 `AZURE_STORAGE_CONNECTION_STRING`으로 지정한다. 사용자 업로드 원본은
+해당 계정의 `uploaded-documents/cases/{case_id}/original/{file_id}_{file_name}`에 저장된다.
 
 복제된 첨부파일 메타데이터에는 `copied_from_case_id`, `copied_from_file_id`, `requires_reconfirmation`을 저장한다. 복사본을 수정하거나 삭제해도 과거 작성 이력의 원본 파일은 변경되지 않는다.
 
@@ -1276,7 +1290,7 @@ AI가 추출하지 못한 값과 실제로 문서에 없는 값은 기술적으�
 
 #### 인덱스명
 
-`decision-cases-index`
+`.env`의 `AZURE_SEARCH_INDEX_NAME` 값. 현재 설정 예: `lim-rag`
 
 #### 필드 예
 
@@ -1548,7 +1562,7 @@ RAG 검색을 시연하려면 과거 결재 데이터가 미리 등록되어 있
 | 유사 결재가 없음 | 「직접 유사한 과거 사례가 없습니다. 결재 기준과 현재 첨부문서로 초안을 작성합니다.」 |
 | 기준 자료도 없음 | 「적용 가능한 기준 자료가 없습니다. 담당부서 확인이 필요한 초안으로 생성합니다.」 |
 | 추출할 수 없는 항목이 있음 | 부족 정보로 화면에 표시하고 사용자에게 추가 입력을 요청한다 |
-| Cosmos DB 저장 실패 | 화면 표시는 계속하고 저장 실패 경고를 표시한다 |
+| 로컬 이력 저장 실패 | 화면 표시는 계속하고 저장 실패 경고를 표시한다 |
 | 출처 검증 실패 | 해당 필드를 `근거 확인 필요`로 표시하고 자동 확정하지 않는다 |
 | 재생성 실패 | 현재 폼을 유지하고 기존 버전을 삭제하지 않는다 |
 
@@ -1594,15 +1608,15 @@ workspace/
 1. 3개 기본 카테고리와 기타의 공통・추가 입력항목, 기준 자료, 샘플 결재 형식을 확정한다
 2. Streamlit으로 UI-00 초기 설정 화면을 만든다
 3. FastAPI로 `/settings/requirements`, `/settings/materials`, `/settings/reindex`를 구현한다
-4. 초기 설정 자료를 Blob Storage와 Cosmos DB에 저장하고 Azure AI Search 인덱스를 갱신한다
+4. 초기 설정 자료를 Blob Storage와 `data/database.json`에 저장하고 Azure AI Search 인덱스를 갱신한다
 5. Streamlit으로 UI-01 신규 작성 화면을 만든다
 6. FastAPI로 `/health`, `/cases`, `/generate` API를 만든다
-7. Blob Storage `lim`에 사용자 업로드 파일을 저장하고 원본 미리보기를 표시한다
+7. 설정된 Storage Account의 `uploaded-documents`에 사용자 업로드 파일을 저장하고 원본 미리보기를 표시한다
 8. PDF 페이지별 텍스트 추출과 출처 데이터 형식을 구현한다
 9. Azure OpenAI로 문서 요약・항목 추출을 구현한다
 10. Azure AI Search 하이브리드 검색과 RAG 프롬프트를 구현한다
 11. UI-02에 원본・결과 좌우 비교와 추가 수정 채팅을 구현한다
-12. Cosmos DB에 안건, 버전, 채팅, 출처를 저장한다
+12. `data/database.json`에 안건, 버전, 채팅, 출처를 저장한다
 13. UI-03 이력 조회와 복제 기능을 구현한다
 14. 데모 시나리오와 오류 상황을 테스트한다
 
@@ -1613,7 +1627,7 @@ workspace/
 | 1주차 | 화면 모형, 데이터 구조, 샘플 데이터, FastAPI 모의 API |
 | 2주차 | Blob 저장, PDF 텍스트 추출, Azure OpenAI 항목 추출 |
 | 3주차 | Azure AI Search, RAG 생성, 원본・결과 비교 |
-| 4주차 | Cosmos DB 이력, 채팅 수정, 통합 테스트, 발표 준비 |
+| 4주차 | 로컬 이력, 채팅 수정, 통합 테스트, 발표 준비 |
 
 ## 12. 데모 시나리오
 
@@ -1664,7 +1678,7 @@ workspace/
 다음 항목을 모두 시연할 수 있으면 현재 구현이 완성된 것으로 판단한다.
 
 - 설정 담당자가 초기 설정 화면에서 카테고리별 필수 입력항목과 필요서류 기준을 등록할 수 있다
-- 초기 설정 자료를 Blob Storage, Cosmos DB, Azure AI Search에 각각 용도별로 저장・반영할 수 있다
+- 초기 설정 원본을 Blob Storage, 메타데이터를 `data/database.json`, 검색 문서를 Azure AI Search에 저장・반영할 수 있다
 - 사용자가 3개 기본 카테고리 또는 기타를 선택하고 기타명을 입력할 수 있다
 - PDF 파일을 업로드하고 Blob Storage에 저장할 수 있다
 - 문서에서 거래처, 제품・서비스명, 기간, 금액, 날짜 중 3개 이상을 추출할 수 있다
@@ -1672,6 +1686,7 @@ workspace/
 - AI가 결재 제목, 본문, 체크리스트를 구조화된 형식으로 생성할 수 있다
 - 생성 필드의 파일명, 페이지, 인용문을 확인할 수 있다
 - 누락 서류 또는 미확인 필드를 경고로 표시하고 사용자가 조치할 수 있다
+- 복수 문서의 금액, 거래처, 서비스명, 이용 기간 불일치를 경고와 체크리스트로 표시할 수 있다
 - 과거 유사 사례가 없어도 기준 자료로 초안을 생성할 수 있다
 - 사용자가 생성 폼을 직접 수정하거나 추가 채팅으로 재생성할 수 있다
 - 최신 생성 결과를 이력으로 저장하고 다시 열 수 있다
@@ -1687,7 +1702,7 @@ workspace/
 | 카테고리 | 영업, 경리・구매, 개발・IT, 기타 직접 입력 |
 | 폼 방식 | 공통 입력항목 + 카테고리별 동적 추가항목 |
 | 작성 전 안내 | 카테고리・종류 선택 후 필수 기재내용과 필요서류를 먼저 표시 |
-| 초기 설정 저장 | 구조화된 기준 설정은 Cosmos DB, 원본 자료는 Blob Storage, 검색용 텍스트는 Azure AI Search에 저장 |
+| 초기 설정 저장 | 구조화된 기준 설정은 `data/database.json`, 원본은 Blob Storage, 검색 문서는 Azure AI Search에 저장 |
 | RAG 지식 | 규정・표준 양식・필요서류 기준이 우선, 과거 결재는 보조 참고 |
 | 최초 결재 | 유사 사례 없이 기준 자료와 현재 문서로 생성 |
 | 유사 결재 | RAG 참고 근거이며 과거 폼 복제와는 별도 기능 |
@@ -1695,6 +1710,8 @@ workspace/
 | 작성자 | 유사도 기준이 아니라 선택 필터 |
 | 결재번호 | 사용자가 알고 있으면 입력하고, 없으면 AI가 후보를 제안 |
 | 근거 표시 | 파일명, 페이지, 인용문을 표시 |
+| 문서 불일치 | 금액, 거래처, 서비스명, 이용 기간을 서버에서 비교하고 경고와 체크리스트에 반영 |
+| Search 등록 | Blob Data source + Text Split/Embedding Skillset + Indexer 사용, direct SDK는 호환 옵션 |
 | 수정 채팅 | 검토 화면의 폼 아래에 배치하고 Enter 입력으로 최신안 갱신 |
 | 저장 방식 | AI 생성・직접 수정・추가 채팅 후 자동 저장 |
 | 이력 복제 | 과거 폼과 첨부문서를 자동 복사하되 날짜・금액・기간은 재확인하고 새 결재번호를 사용 |
@@ -1709,11 +1726,13 @@ workspace/
 4. `영업`, `경리・구매`, `개발・IT` 분류가 발표 대상 조직의 업무에 적합한가
 5. 결재번호를 사용자가 입력할지, AI가 후보만 제안할지
 6. Azure OpenAI에 배포된 채팅 모델과 Embedding 모델의 정확한 배포명은 무엇인가
-7. Cosmos DB를 신규 생성할 권한과 예산이 있는가
+7. 현재 데모 이력을 로컬 JSON으로 유지할 운영 조건이 적절한가
 
 ## 16. 발표용 요약
 
-본 시스템은 Streamlit과 FastAPI로 구성한 Web 애플리케이션에 Azure OpenAI Service, Azure AI Search, Cosmos DB, Blob Storage를 조합한 RAG형 결재 서류 작성 지원 시스템이다. 설정 담당자가 먼저 결재 규정, 표준 양식, 필요서류 기준, 카테고리별 입력항목을 초기 설정으로 등록한다.
+본 시스템은 Streamlit과 FastAPI로 구성한 Web 애플리케이션에 Azure OpenAI Service,
+Azure AI Search, Azure Blob Storage와 로컬 JSON 이력 저장소를 조합한 RAG형 결재 서류 작성 지원 시스템이다.
+설정 담당자가 먼저 결재 규정, 표준 양식, 필요서류 기준, 카테고리별 입력항목을 초기 설정으로 등록한다.
 
 사용자가 업무 카테고리를 선택하고 결재 목적과 관련 문서를 입력하면 AI가 거래처, 제품・서비스, 기간, 금액 등을 추출한다. Azure AI Search는 결재 규정, 필요서류 기준, 표준 양식, 과거 유사 결재를 검색하고, RAG는 이 근거를 바탕으로 결재 폼 초안, 누락 경고, 체크리스트를 생성한다. 사용자는 원본 문서와 생성 결과를 비교하고 추가 채팅으로 수정한 뒤 이력으로 저장할 수 있다.
 
@@ -1723,4 +1742,3 @@ workspace/
 - [Azure AI Search 벡터 검색 필터](https://learn.microsoft.com/en-us/azure/search/vector-search-filters)
 - [Azure OpenAI Structured Outputs](https://learn.microsoft.com/en-us/azure/ai-services/openai/how-to/structured-outputs)
 - [Azure Storage Account 생성과 이름 규칙](https://learn.microsoft.com/en-us/azure/storage/common/storage-account-create)
-- [Azure Cosmos DB Free Tier](https://learn.microsoft.com/en-us/azure/cosmos-db/free-tier)

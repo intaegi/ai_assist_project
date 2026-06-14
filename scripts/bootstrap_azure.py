@@ -1,8 +1,12 @@
+import sys
+
 from backend.app.core.config import Settings
 from backend.app.services.ai_service import AzureAIService
 from backend.app.services.search_service import AzureSearchService
 from backend.app.services.storage import (
+    AzureBlobStore,
     AzureDataStore,
+    LocalDataStore,
     create_blob_structures,
     create_cosmos_structures,
 )
@@ -10,6 +14,8 @@ from scripts.seed_data import load_seed_data, seed_store
 
 
 def main() -> None:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     settings = Settings(app_storage_mode="azure")
     missing = settings.missing_azure_settings()
     if missing:
@@ -17,22 +23,36 @@ def main() -> None:
 
     print("1/5 Blob Storageコンテナを確認します")
     create_blob_structures(settings)
+    blob_store = AzureBlobStore(settings)
 
-    print("2/5 Cosmos DBデータベースとコンテナを確認します")
-    create_cosmos_structures(settings)
-    data_store = AzureDataStore(settings)
+    if settings.azure_cosmos_enabled:
+        print("2/5 Cosmos DBデータベースとコンテナを確認します")
+        create_cosmos_structures(settings)
+        data_store = AzureDataStore(settings)
+    else:
+        print("2/5 Cosmos DBは無効です。ローカル履歴ストアを使用します")
+        data_store = LocalDataStore(settings.data_dir)
 
     print("3/5 Azure OpenAI Embedding接続を確認します")
     ai_service = AzureAIService(settings)
     dimensions = len(ai_service.embed("決裁RAGインデックス初期化"))
 
     print(f"4/5 AI Searchインデックスを作成します（vector dimensions={dimensions}）")
-    search_service = AzureSearchService(settings, ai_service.embed)
+    search_service = AzureSearchService(settings, ai_service.embed, blob_store)
     search_service.create_index(dimensions)
+    if settings.azure_search_ingestion_mode == "indexer":
+        search_service.create_indexer_pipeline(dimensions)
 
     print("5/5 架空サンプルデータを登録します")
     counts = seed_store(data_store, settings.project_root)
     _, decisions, materials = load_seed_data(settings.project_root)
+    for material in materials:
+        blob_store.upload(
+            "config-materials",
+            material["storage_path"],
+            material["content"].encode("utf-8"),
+            "text/markdown",
+        )
     documents = []
     for item in materials + decisions:
         documents.append(
@@ -55,7 +75,11 @@ def main() -> None:
             }
         )
     indexed = search_service.index_documents(documents)
-    print(f"完了: {counts}, indexed={indexed}, index={settings.azure_search_index_name}")
+    print(
+        "完了: "
+        f"{counts}, indexed={indexed}, index={settings.azure_search_index_name}, "
+        f"ingestion={settings.azure_search_ingestion_mode}"
+    )
 
 
 if __name__ == "__main__":

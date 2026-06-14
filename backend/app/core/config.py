@@ -27,13 +27,25 @@ class Settings(BaseSettings):
     azure_search_endpoint: str = ""
     azure_search_api_key: str = Field(default="", repr=False)
     azure_search_index_name: str = "lim-decision-rag-index"
+    azure_search_ingestion_mode: Literal["indexer", "direct"] = "indexer"
+    azure_search_data_source_name: str = "lim-decision-rag-blob-datasource"
+    azure_search_skillset_name: str = "lim-decision-rag-skillset"
+    azure_search_indexer_name: str = "lim-decision-rag-indexer"
+    azure_search_knowledge_container: str = "search-knowledge"
+    azure_search_indexer_interval_minutes: int = 5
 
     azure_storage_connection_string: str = Field(default="", repr=False)
+    azure_cosmos_enabled: bool = True
     azure_cosmos_endpoint: str = ""
     azure_cosmos_key: str = Field(default="", repr=False)
     azure_cosmos_database: str = "decision-rag"
     azure_cosmos_decision_container: str = "decision-data"
     azure_cosmos_past_container: str = "past-decisions"
+    azure_openai_embedding_model: Literal[
+        "text-embedding-ada-002",
+        "text-embedding-3-small",
+        "text-embedding-3-large",
+    ] = "text-embedding-3-small"
 
     @property
     def project_root(self) -> Path:
@@ -53,9 +65,14 @@ class Settings(BaseSettings):
             "AZURE_SEARCH_ENDPOINT": self.azure_search_endpoint,
             "AZURE_SEARCH_API_KEY": self.azure_search_api_key,
             "AZURE_STORAGE_CONNECTION_STRING": self.azure_storage_connection_string,
-            "AZURE_COSMOS_ENDPOINT": self.azure_cosmos_endpoint,
-            "AZURE_COSMOS_KEY": self.azure_cosmos_key,
         }
+        if self.azure_cosmos_enabled:
+            required.update(
+                {
+                    "AZURE_COSMOS_ENDPOINT": self.azure_cosmos_endpoint,
+                    "AZURE_COSMOS_KEY": self.azure_cosmos_key,
+                }
+            )
         return [name for name, value in required.items() if not value.strip()]
 
 

@@ -23,6 +23,7 @@ class ServiceContainer:
     ai_service: object
     search_service: object
     rag_service: RagService
+    data_store_mode: str
 
 
 def create_services(settings: Settings) -> ServiceContainer:
@@ -31,17 +32,23 @@ def create_services(settings: Settings) -> ServiceContainer:
         missing = settings.missing_azure_settings()
         if missing:
             raise RuntimeError(f"Azure設定が不足しています: {', '.join(missing)}")
-        data_store = AzureDataStore(settings)
+        if settings.azure_cosmos_enabled:
+            data_store = AzureDataStore(settings)
+            data_store_mode = "azure"
+        else:
+            data_store = LocalDataStore(settings.data_dir)
+            data_store_mode = "local"
         blob_store = AzureBlobStore(settings)
         ai_service = AzureAIService(settings)
-        search_service = AzureSearchService(settings, ai_service.embed)
+        search_service = AzureSearchService(settings, ai_service.embed, blob_store)
     else:
         data_store = LocalDataStore(settings.data_dir)
+        data_store_mode = "local"
         blob_store = LocalBlobStore(settings.data_dir)
         ai_service = LocalAIService()
         search_service = LocalSearchService(data_store)
-        if not data_store.list_requirements():
-            seed_store(data_store, settings.project_root)
+    if data_store_mode == "local" and not data_store.list_requirements():
+        seed_store(data_store, settings.project_root)
     rag_service = RagService(data_store, blob_store, document_service, ai_service, search_service)
     return ServiceContainer(
         settings=settings,
@@ -51,4 +58,5 @@ def create_services(settings: Settings) -> ServiceContainer:
         ai_service=ai_service,
         search_service=search_service,
         rag_service=rag_service,
+        data_store_mode=data_store_mode,
     )

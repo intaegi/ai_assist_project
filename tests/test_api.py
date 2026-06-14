@@ -19,6 +19,14 @@ def test_health(client):
     assert response.json()["status"] == "ok"
 
 
+def test_dependency_health_reports_local_mode(client):
+    response = client.get("/health/dependencies")
+    assert response.status_code == 200
+    assert response.json()["mode"] == "local"
+    assert response.json()["data_store_mode"] == "local"
+    assert response.json()["checks"]["cosmos"]["status"] == "skipped"
+
+
 def test_requirements_are_seeded(client):
     response = client.get(
         "/requirements",
@@ -39,6 +47,16 @@ def test_generate_warns_when_required_document_is_missing(client):
     assert payload["current_version"] == 1
     codes = {item["code"] for item in payload["validation_results"]}
     assert "REQUIRED_DOCUMENT_MISSING" in codes
+    generated_output = (
+        client.app.state.services.settings.data_dir
+        / "files"
+        / "generated-outputs"
+        / "cases"
+        / case["case_id"]
+        / "versions"
+        / "1.json"
+    )
+    assert generated_output.exists()
 
 
 def test_patch_auto_saves_form(client):
@@ -88,6 +106,16 @@ def test_file_add_inline_get_and_delete(client):
     )
     assert added.status_code == 200, added.text
     file_record = added.json()["files"][0]
+    extracted_text = (
+        client.app.state.services.settings.data_dir
+        / "files"
+        / "extracted-texts"
+        / "cases"
+        / case["case_id"]
+        / "text"
+        / f"{file_record['id']}.json"
+    )
+    assert extracted_text.exists()
 
     fetched = client.get(f"/cases/{case['case_id']}/files/{file_record['id']}")
     assert fetched.status_code == 200
@@ -96,6 +124,7 @@ def test_file_add_inline_get_and_delete(client):
     deleted = client.delete(f"/cases/{case['case_id']}/files/{file_record['id']}")
     assert deleted.status_code == 200
     assert deleted.json()["files"] == []
+    assert not extracted_text.exists()
 
 
 def test_requirement_setting_can_be_updated(client):
@@ -114,3 +143,24 @@ def test_requirement_setting_can_be_updated(client):
         params={"business_category": "other", "approval_type": "その他"},
     )
     assert fetched.json()["required_documents"] == ["申請根拠資料"]
+
+
+def test_local_reindex_does_not_duplicate_materials(client):
+    uploaded = client.post(
+        "/settings/materials",
+        data={
+            "business_category": "it",
+            "approval_type": "支払",
+            "knowledge_type": "policy",
+            "title": "テスト決裁規程",
+        },
+        files={"file": ("policy.md", b"# policy", "text/markdown")},
+    )
+    assert uploaded.status_code == 200
+
+    first = client.post("/settings/reindex")
+    second = client.post("/settings/reindex")
+
+    assert first.status_code == 200
+    assert first.json()["mode"] == "local"
+    assert second.json()["indexed"] == first.json()["indexed"]

@@ -13,3 +13,9 @@ def test_result_uses_chat_input_without_save_button():
     assert "st.chat_input" in source
     assert "変更内容を保存" not in source
     assert "作成完了" not in source
+
+
+def test_streamlit_entrypoint_adds_project_root_to_python_path():
+    source = Path("frontend/app.py").read_text(encoding="utf-8")
+    assert "Path(__file__).resolve().parents[1]" in source
+    assert "sys.path.insert(0, str(PROJECT_ROOT))" in source

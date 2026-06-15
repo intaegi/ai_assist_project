@@ -143,7 +143,16 @@ def _render_field_copy_button(
     text = "" if value is None else str(value)
     serialized = json.dumps(text, ensure_ascii=False).replace("</", "<\\/")
     safe_label = html.escape(label)
-    button_text = "Copy" if compact else "コピー"
+    button_content = (
+        """
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/>
+          <rect x="4" y="7" width="12" height="14" rx="2"/>
+        </svg>
+        """
+        if compact
+        else "コピー"
+    )
     components.html(
         f"""
         <button
@@ -151,7 +160,7 @@ def _render_field_copy_button(
           type="button"
           title="{safe_label}をコピー"
           aria-label="{safe_label}をコピー"
-        >{button_text}</button>
+        >{button_content}</button>
         <span id="copy-result" aria-live="polite"></span>
         <script>
           const button = document.getElementById("copy-field");
@@ -188,6 +197,16 @@ def _render_field_copy_button(
             background: #fff;
             cursor: pointer;
             font-size: 11px;
+          }}
+          svg {{
+            width: 17px;
+            height: 17px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            vertical-align: middle;
           }}
           button:hover {{ background: #eef6fb; border-color: #1769aa; }}
           button:focus {{ outline: 2px solid #80b7df; outline-offset: 1px; }}

@@ -27,7 +27,8 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "フォーム内容をコピー" in source
     assert "_render_field_copy_button" in source
     assert "タイトルをコピー" not in source
-    assert 'button_text = "Copy" if compact else "コピー"' in source
+    assert '<svg viewBox="0 0 24 24"' in source
+    assert 'if compact' in source
     assert "build_comparison_rows" in source
     assert "不足書類を追加して再確認" in source
     assert "書類を追加して再確認" in source

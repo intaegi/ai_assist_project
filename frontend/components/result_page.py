@@ -235,10 +235,12 @@ def _render_document_recovery(client, case: dict) -> None:
                 "書類を追加して再確認",
                 type="primary",
                 use_container_width=True,
-                disabled=not files,
             )
 
         if submitted:
+            if not files:
+                st.warning("追加書類を1件以上選択してください。")
+                return
             try:
                 added_names = []
                 skipped_names = []

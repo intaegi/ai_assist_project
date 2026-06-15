@@ -17,6 +17,8 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "修正チャット履歴" in source
     assert "st.chat_message(" in source
     assert "登録済みのためスキップしました" in source
+    assert "追加書類を1件以上選択してください。" in source
+    assert "disabled=not files" not in source
     assert "revision_success_message" in source
     assert "過去の修正履歴を表示" in source
     assert 'st.subheader("要約")' in source

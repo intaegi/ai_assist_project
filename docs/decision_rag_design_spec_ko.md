@@ -958,7 +958,7 @@ AI가 추출하지 못한 값과 실제로 문서에 없는 값은 기술적으�
 FastAPI는 파일을 Blob Storage에 저장하고, 파일 메타데이터를 `data/database.json`에 저장한다.
 
 `POST /settings/reindex`는 애플리케이션 데이터 저장소에 등록된 기준 자료와 샘플 과거 결재를
-공통 문서 구조로 정규화하고 `search-knowledge/documents/`에 JSON으로 동기화한 뒤 Indexer를 즉시 실행한다.
+공통 문서 구조로 정규화하고 `lim-pbl-search-knowledge/documents/`에 JSON으로 동기화한 뒤 Indexer를 즉시 실행한다.
 Indexer는 Skillset의 Text Split과 Azure OpenAI Embedding을 적용하고 chunk 단위로 Search 인덱스에 투영한다.
 `AZURE_SEARCH_INGESTION_MODE=direct`는 장애 대응과 이전 구성 호환을 위한 선택 옵션이다.
 
@@ -1277,7 +1277,7 @@ Indexer는 Skillset의 Text Split과 Azure OpenAI Embedding을 적용하고 chun
 | `uploaded-documents` | 업로드 원본 | `cases/{case_id}/original/{file_id}_{file_name}` |
 | `extracted-texts` | 페이지 정보가 포함된 추출 텍스트 | `cases/{case_id}/text/{file_id}.json` |
 | `generated-outputs` | AI 생성·재생성 버전 결과 | `cases/{case_id}/versions/{version}.json` |
-| `search-knowledge` | Data source가 읽는 정규화된 RAG 지식 JSON | `documents/{sha256(id)}.json` |
+| `lim-pbl-search-knowledge` | Data source가 읽는 정규화된 RAG 지식 JSON | `documents/{sha256(id)}.json` |
 
 추출 텍스트 JSON에는 `file_id`, `page`, `text`를 저장한다.
 

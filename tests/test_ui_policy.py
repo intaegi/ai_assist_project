@@ -13,8 +13,12 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "st.chat_input" not in source
     assert "st.form(" in source
     assert "st.form_submit_button(" in source
+    assert "clear_on_submit=False" in source
     assert "修正チャット履歴" in source
     assert "st.chat_message(" in source
+    assert "登録済みのためスキップしました" in source
+    assert "revision_success_message" in source
+    assert "過去の修正履歴を表示" in source
     assert 'st.subheader("要約")' in source
     assert 'st.tabs(["要約"' not in source
     assert 'st.expander("詳細情報"' in source
@@ -40,6 +44,7 @@ def test_streamlit_entrypoint_adds_project_root_to_python_path():
 def test_streamlit_theme_uses_blue_primary_color():
     source = Path(".streamlit/config.toml").read_text(encoding="utf-8")
     assert 'primaryColor = "#1769AA"' in source
+    assert 'toolbarMode = "minimal"' in source
 
 
 def test_material_registration_is_single_item_and_clears_form():

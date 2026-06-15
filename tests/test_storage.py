@@ -34,12 +34,12 @@ def test_local_store_compacts_duplicate_materials_on_startup(tmp_path):
 
 def test_local_blob_store_syncs_search_documents_and_removes_stale_files(tmp_path):
     store = LocalBlobStore(tmp_path)
-    stale = tmp_path / "files" / "search-knowledge" / "documents" / "stale.json"
+    stale = tmp_path / "files" / "lim-pbl-search-knowledge" / "documents" / "stale.json"
     stale.parent.mkdir(parents=True)
     stale.write_text("{}", encoding="utf-8")
 
     count = store.sync_json_documents(
-        "search-knowledge",
+        "lim-pbl-search-knowledge",
         "documents",
         [{"id": "policy-1", "title": "支払規程", "content": "10万円以上"}],
     )

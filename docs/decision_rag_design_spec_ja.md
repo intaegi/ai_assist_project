@@ -811,7 +811,7 @@ StreamlitからFastAPIが稼働しているか確認する開発・運用用API�
 FastAPIはファイルをBlob Storageへ保存し、ファイルメタデータを`data/database.json`へ保存する。
 
 `POST /settings/reindex`は登録済みの基準資料とサンプル過去決裁を共通文書形式へ正規化し、
-`search-knowledge/documents/`へJSONとして同期した後、Indexerを即時実行する。
+`lim-pbl-search-knowledge/documents/`へJSONとして同期した後、Indexerを即時実行する。
 IndexerはSkillsetのText SplitとAzure OpenAI Embeddingを適用し、チャンク単位でSearchへ投影する。
 `AZURE_SEARCH_INGESTION_MODE=direct`は障害対応と旧構成互換用の選択肢として残す。
 

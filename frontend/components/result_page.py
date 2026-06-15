@@ -48,6 +48,16 @@ def _revision_target_label(target_field: str) -> str:
     )
 
 
+def _render_revision_logs(logs: list[dict]) -> None:
+    for log in logs:
+        role = log.get("role", "assistant")
+        with st.chat_message(role if role in {"user", "assistant"} else "assistant"):
+            target = _revision_target_label(log.get("target_field", ""))
+            if target:
+                st.caption(f"修正対象: {target}")
+            st.write(log.get("message", ""))
+
+
 def _clear_form_state(case_id: str) -> None:
     prefix = f"form_{case_id}_"
     for field in FORM_STATE_FIELDS:
@@ -196,39 +206,52 @@ def _render_document_recovery(client, case: dict) -> None:
         if document and document not in missing_names:
             missing_names.append(document)
 
+    input_version_key = f"recovery_input_version_{case['case_id']}"
+    input_version = st.session_state.get(input_version_key, 0)
+
     with st.container(border=True):
         st.markdown("##### 不足書類を追加して再確認")
         if missing_names:
             st.caption("現在不足している書類: " + "、".join(missing_names))
-        files = st.file_uploader(
-            "追加書類",
-            type=["pdf", "jpg", "jpeg", "png"],
-            accept_multiple_files=True,
-            key=f"recovery_files_{case['case_id']}",
-        )
-        instruction = st.text_area(
-            "AIへの反映指示",
-            value="追加した書類の内容を確認し、決裁フォーム、要約、チェックリストを更新してください。",
-            height=90,
-            key=f"recovery_instruction_{case['case_id']}",
-        )
-        regenerate = st.checkbox(
-            "追加書類を反映してAI決裁案を再作成する",
-            value=True,
-            key=f"recovery_regenerate_{case['case_id']}",
-        )
-        if st.button(
-            "書類を追加して再確認",
-            type="primary",
-            use_container_width=True,
-            disabled=not files,
-            key=f"recovery_submit_{case['case_id']}",
-        ):
+        with st.form(f"recovery_form_{case['case_id']}", clear_on_submit=False):
+            files = st.file_uploader(
+                "追加書類",
+                type=["pdf", "jpg", "jpeg", "png"],
+                accept_multiple_files=True,
+                key=f"recovery_files_{case['case_id']}_{input_version}",
+            )
+            instruction = st.text_area(
+                "AIへの反映指示",
+                value="追加した書類の内容を確認し、決裁フォーム、要約、チェックリストを更新してください。",
+                height=90,
+                key=f"recovery_instruction_{case['case_id']}_{input_version}",
+            )
+            regenerate = st.checkbox(
+                "追加書類を反映してAI決裁案を再作成する",
+                value=True,
+                key=f"recovery_regenerate_{case['case_id']}_{input_version}",
+            )
+            submitted = st.form_submit_button(
+                "書類を追加して再確認",
+                type="primary",
+                use_container_width=True,
+                disabled=not files,
+            )
+
+        if submitted:
             try:
+                added_names = []
+                skipped_names = []
                 with st.status("追加書類を確認しています", expanded=True) as status:
                     for file in files or []:
-                        st.write(f"{file.name} を保存しています")
-                        client.add_file(case["case_id"], file)
+                        response = client.add_file(case["case_id"], file)
+                        upload_result = response.get("file_upload", {})
+                        if upload_result.get("added", True):
+                            added_names.append(file.name)
+                            st.write(f"{file.name} を保存しました")
+                        else:
+                            skipped_names.append(file.name)
+                            st.write(f"{file.name} は登録済みのためスキップしました")
                     if regenerate:
                         st.write("追加書類を反映してAI決裁案を再作成しています")
                         client.generate(
@@ -242,9 +265,16 @@ def _render_document_recovery(client, case: dict) -> None:
                         state="complete",
                         expanded=False,
                     )
-                st.session_state["document_recovery_message"] = (
-                    "追加書類を保存し、不足・注意とチェックリストを再確認しました。"
-                )
+                messages = []
+                if added_names:
+                    messages.append(f"追加保存: {len(added_names)}件")
+                if skipped_names:
+                    messages.append(
+                        "重複のためスキップ: " + "、".join(skipped_names)
+                    )
+                messages.append("不足・注意とチェックリストを再確認しました。")
+                st.session_state["document_recovery_message"] = " / ".join(messages)
+                st.session_state[input_version_key] = input_version + 1
                 st.rerun()
             except ApiError as exc:
                 st.error(str(exc))
@@ -450,33 +480,41 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
 
     st.markdown("---")
     st.subheader("AIへの修正依頼")
+    input_version_key = f"revision_input_version_{case_id}"
+    input_version = st.session_state.get(input_version_key, 0)
+    instruction_key = f"revision_instruction_{case_id}_{input_version}"
+    success_message_key = f"revision_success_message_{case_id}"
+    if message := st.session_state.pop(success_message_key, None):
+        st.success(message)
+
     chat_logs = case.get("chat_logs", [])
     if chat_logs:
         st.markdown("#### 修正チャット履歴")
-        for log in chat_logs:
-            role = log.get("role", "assistant")
-            with st.chat_message(role if role in {"user", "assistant"} else "assistant"):
-                target = _revision_target_label(log.get("target_field", ""))
-                if target:
-                    st.caption(f"修正対象: {target}")
-                st.write(log.get("message", ""))
+        recent_logs = chat_logs[-6:]
+        with st.container(border=True):
+            _render_revision_logs(recent_logs)
+        older_logs = chat_logs[:-len(recent_logs)]
+        if older_logs:
+            with st.expander(f"過去の修正履歴を表示（{len(older_logs) // 2}件）"):
+                _render_revision_logs(older_logs)
 
-    with st.form(f"revision_form_{case_id}", clear_on_submit=True):
-        target_label = st.selectbox(
-            "修正対象",
-            list(REVISION_TARGETS),
-            key=f"revision_target_{case_id}",
-        )
-        instruction = st.text_area(
-            "修正内容",
-            placeholder="例: 決裁本文を承認者向けに1文へまとめてください。",
-            key=f"revision_instruction_{case_id}",
-        )
-        submitted = st.form_submit_button(
-            "AIに修正を依頼",
-            type="primary",
-            use_container_width=True,
-        )
+    with st.container(border=True):
+        with st.form(f"revision_form_{case_id}", clear_on_submit=False):
+            target_label = st.selectbox(
+                "修正対象",
+                list(REVISION_TARGETS),
+                key=f"revision_target_{case_id}",
+            )
+            instruction = st.text_area(
+                "修正内容",
+                placeholder="例: 決裁本文を承認者向けに1文へまとめてください。",
+                key=instruction_key,
+            )
+            submitted = st.form_submit_button(
+                "AIに修正を依頼",
+                type="primary",
+                use_container_width=True,
+            )
 
     if submitted:
         if not instruction.strip():
@@ -490,6 +528,10 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
                     REVISION_TARGETS[target_label],
                 )
             _clear_form_state(case_id)
+            st.session_state[input_version_key] = input_version + 1
+            st.session_state[success_message_key] = (
+                f"{target_label}を更新し、フォームと修正履歴に反映しました。"
+            )
             st.rerun()
         except ApiError as exc:
             st.error(str(exc))

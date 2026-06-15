@@ -54,6 +54,9 @@ st.markdown(
       h1 { font-size: 1.75rem !important; letter-spacing: 0; }
       h2, h3 { letter-spacing: 0; }
       div[data-testid="stForm"] { border: 0; padding: 0; }
+      div[data-testid="stStatusWidget"] { margin-top: 0.75rem; }
+      div[data-testid="stChatMessage"] { padding: 0.75rem 1rem; }
+      div[data-testid="stFormSubmitButton"] button { min-height: 2.75rem; }
       button[kind="primary"] { background: #1769aa; border-color: #1769aa; }
     </style>
     """,

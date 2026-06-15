@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     azure_search_data_source_name: str = "lim-decision-rag-blob-datasource"
     azure_search_skillset_name: str = "lim-decision-rag-skillset"
     azure_search_indexer_name: str = "lim-decision-rag-indexer"
-    azure_search_knowledge_container: str = "search-knowledge"
+    azure_search_knowledge_container: str = "lim-pbl-search-knowledge"
     azure_search_indexer_interval_minutes: int = 5
 
     azure_storage_connection_string: str = Field(default="", repr=False)

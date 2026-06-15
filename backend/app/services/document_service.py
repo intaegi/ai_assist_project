@@ -1,3 +1,4 @@
+import hashlib
 import io
 from pathlib import Path
 from uuid import uuid4
@@ -41,6 +42,7 @@ class DocumentService:
             file_name=Path(file_name).name,
             content_type=content_type,
             size=len(content),
+            content_hash=hashlib.sha256(content).hexdigest(),
             storage_path=storage_path,
             pages=self.extract_pages(content, content_type),
         )

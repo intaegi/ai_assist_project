@@ -135,6 +135,27 @@ def test_file_add_inline_get_and_delete(client):
     assert not extracted_text.exists()
 
 
+def test_duplicate_file_content_is_not_added_twice(client):
+    case = create_case(client)
+    content = b"\x89PNG\r\n\x1a\nsame-file"
+
+    first = client.post(
+        f"/cases/{case['case_id']}/files",
+        files={"file": ("invoice.png", content, "image/png")},
+    )
+    duplicate = client.post(
+        f"/cases/{case['case_id']}/files",
+        files={"file": ("renamed-invoice.png", content, "image/png")},
+    )
+
+    assert first.status_code == 200
+    assert first.json()["file_upload"]["added"] is True
+    assert duplicate.status_code == 200
+    assert duplicate.json()["file_upload"]["added"] is False
+    assert len(duplicate.json()["files"]) == 1
+    assert duplicate.json()["files"][0]["content_hash"]
+
+
 def test_missing_document_is_revalidated_and_marked_resolved_after_upload(client):
     case = create_case(client)
     generated = client.post(f"/cases/{case['case_id']}/generate").json()

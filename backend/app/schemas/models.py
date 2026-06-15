@@ -88,6 +88,7 @@ class FileRecord(BaseModel):
     file_name: str
     content_type: str
     size: int
+    content_hash: str | None = None
     storage_path: str
     pages: list[dict[str, Any]] = Field(default_factory=list)
     copied_from_case_id: str | None = None

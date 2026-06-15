@@ -15,7 +15,6 @@ REQUIRED_BLOB_CONTAINERS = (
     "uploaded-documents",
     "extracted-texts",
     "generated-outputs",
-    "search-knowledge",
 )
 
 

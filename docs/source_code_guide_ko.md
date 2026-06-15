@@ -391,6 +391,8 @@ Blob 저장 경로:
 - 초기 설정 자료: `config-materials/settings/{category}/{approval_type}/{material_id}/{file_name}`
 - 신규 작성 첨부: `uploaded-documents/cases/{case_id}/original/{file_id}_{file_name}`
 - Local mode의 같은 논리 경로: `data/files/{container}/{path}`
+- 동일 안건에 같은 내용의 파일을 다시 올리면 SHA-256으로 판정해 중복 저장하지 않는다.
+- AI Search Data source는 `lim-pbl-search-knowledge/documents/`의 정규화 JSON을 읽는다.
 
 ### 6.3 `backend/app/services/document_service.py`
 

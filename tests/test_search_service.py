@@ -37,7 +37,7 @@ def test_indexer_mode_stages_documents_and_runs_indexer():
 
     assert count == 2
     blob_store.sync_json_documents.assert_called_once_with(
-        "search-knowledge",
+        "lim-pbl-search-knowledge",
         "documents",
         [
             {"id": "policy-1", "source_id": "policy-1", "content": "policy"},

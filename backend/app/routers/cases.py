@@ -1,3 +1,4 @@
+import hashlib
 import json
 from pathlib import Path
 from urllib.parse import quote
@@ -24,10 +25,31 @@ def _get_case(request: Request, case_id: str) -> CaseRecord:
     return CaseRecord.model_validate(item)
 
 
-async def _store_file(request: Request, case_id: str, upload: UploadFile) -> FileRecord:
+async def _store_file(
+    request: Request,
+    case_id: str,
+    upload: UploadFile,
+    existing_files: list[FileRecord],
+) -> tuple[FileRecord, bool]:
     services = request.app.state.services
     content = await upload.read()
     file_name = Path(upload.filename or "document").name
+    content_hash = hashlib.sha256(content).hexdigest()
+    for existing in existing_files:
+        if existing.content_hash == content_hash:
+            return existing, False
+        if existing.content_hash is None and existing.size == len(content):
+            try:
+                stored = services.blob_store.download(
+                    "uploaded-documents",
+                    existing.storage_path,
+                )
+            except Exception:
+                continue
+            if hashlib.sha256(stored).hexdigest() == content_hash:
+                existing.content_hash = content_hash
+                return existing, False
+
     file_id = f"file_{uuid4().hex[:12]}"
     path = f"cases/{case_id}/original/{file_id}_{file_name}"
     storage_path = services.blob_store.upload(
@@ -60,7 +82,7 @@ async def _store_file(request: Request, case_id: str, upload: UploadFile) -> Fil
         ).encode("utf-8"),
         "application/json",
     )
-    return record
+    return record, True
 
 
 @router.get("/requirements")
@@ -127,11 +149,28 @@ async def create_case(
         amount=normalized_amount,
         category_fields=parsed_fields,
     )
+    file_upload_results = []
     for upload in files:
         if upload.filename:
-            case.files.append(await _store_file(request, case_id, upload))
+            record, added = await _store_file(
+                request,
+                case_id,
+                upload,
+                case.files,
+            )
+            if added:
+                case.files.append(record)
+            file_upload_results.append(
+                {
+                    "file_name": Path(upload.filename).name,
+                    "file_id": record.id,
+                    "added": added,
+                }
+            )
     request.app.state.services.data_store.save_case(case.model_dump(mode="json"))
-    return case.model_dump(mode="json")
+    payload = case.model_dump(mode="json")
+    payload["file_upload_results"] = file_upload_results
+    return payload
 
 
 @router.get("/cases")
@@ -191,13 +230,22 @@ def revise_case(case_id: str, payload: ChatRequest, request: Request) -> dict:
 async def add_file(case_id: str, request: Request, file: UploadFile = File(...)) -> dict:
     case = _get_case(request, case_id)
     previous_validations = list(case.validation_results)
-    case.files.append(await _store_file(request, case_id, file))
+    record, added = await _store_file(request, case_id, file, case.files)
+    if added:
+        case.files.append(record)
     services = request.app.state.services
-    services.rag_service.refresh_validation(case)
-    services.rag_service.update_resolution_notices(case, previous_validations)
-    case.updated_at = utc_now()
+    if added:
+        services.rag_service.refresh_validation(case)
+        services.rag_service.update_resolution_notices(case, previous_validations)
+        case.updated_at = utc_now()
     services.data_store.save_case(case.model_dump(mode="json"))
-    return case.model_dump(mode="json")
+    payload = case.model_dump(mode="json")
+    payload["file_upload"] = {
+        "file_name": Path(file.filename or "document").name,
+        "file_id": record.id,
+        "added": added,
+    }
+    return payload
 
 
 @router.delete("/cases/{case_id}/files/{file_id}")

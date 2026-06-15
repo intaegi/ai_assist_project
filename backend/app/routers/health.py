@@ -6,8 +6,17 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
-def health(request: Request) -> dict[str, str]:
-    return {"status": "ok", "service": request.app.state.settings.app_name}
+def health(request: Request) -> dict[str, object]:
+    return {
+        "status": "ok",
+        "service": request.app.state.settings.app_name,
+        "api_revision": "document-recovery-v2",
+        "features": [
+            "document_recovery",
+            "checklist_verification",
+            "targeted_revision",
+        ],
+    }
 
 
 @router.get("/health/dependencies")
@@ -49,10 +58,11 @@ def dependency_health(request: Request) -> dict[str, object]:
         }
         checks["search"]["details"] = {
             "index": services.settings.azure_search_index_name,
-            "registration_method": "application_direct_push",
-            "indexer_required": False,
-            "data_source_required": False,
-            "skillset_required": False,
+            "registration_method": services.settings.azure_search_ingestion_mode,
+            "indexer": services.settings.azure_search_indexer_name,
+            "data_source": services.settings.azure_search_data_source_name,
+            "skillset": services.settings.azure_search_skillset_name,
+            "knowledge_container": services.settings.azure_search_knowledge_container,
         }
         checks["cosmos"]["details"] = {
             "database": (

@@ -56,6 +56,7 @@ class RagService:
             extracted_fields=extracted,
             references=references,
             required_documents=required_documents,
+            instruction=instruction,
         )
         present_documents = self.document_service.document_types(case.files)
         validations = self._validate(
@@ -102,7 +103,28 @@ class RagService:
         return case
 
     def revise(self, case: CaseRecord, instruction: str, target_field: str) -> CaseRecord:
+        if target_field == "all":
+            updated = self.generate(case, instruction=instruction)
+            updated.chat_logs.extend(
+                [
+                    {
+                        "role": "user",
+                        "message": instruction,
+                        "target_field": target_field,
+                        "created_at": utc_now(),
+                    },
+                    {
+                        "role": "assistant",
+                        "message": "追加書類と現在の入力を基に決裁案全体を更新しました。",
+                        "target_field": target_field,
+                        "created_at": utc_now(),
+                    },
+                ]
+            )
+            self.data_store.save_case(updated.model_dump(mode="json"))
+            return updated
         case.approval_form = self.ai_service.revise(case.approval_form, instruction, target_field)
+        assistant_message = self._revision_message(case, target_field)
         self.refresh_validation(case)
         case.checklist_verification = []
         case.current_version += 1
@@ -111,7 +133,7 @@ class RagService:
         case.chat_logs.extend(
             [
                 {"role": "user", "message": instruction, "target_field": target_field, "created_at": utc_now()},
-                {"role": "assistant", "message": "決裁案を更新しました。", "target_field": target_field, "created_at": utc_now()},
+                {"role": "assistant", "message": assistant_message, "target_field": target_field, "created_at": utc_now()},
             ]
         )
         case.versions.append(
@@ -125,6 +147,32 @@ class RagService:
         self._save_generated_output(case)
         self.data_store.save_case(case.model_dump(mode="json"))
         return case
+
+    @staticmethod
+    def _revision_message(case: CaseRecord, target_field: str) -> str:
+        form = case.approval_form
+        if target_field == "body":
+            return f"決裁本文を更新しました。\n\n{form.body}"
+        if target_field == "form":
+            return "決裁フォーム全体を更新しました。"
+        if target_field == "service_period":
+            return (
+                "利用期間を更新しました。"
+                f"\n\n{form.service_start_date or '-'} ～ {form.service_end_date or '-'}"
+            )
+
+        labels = {
+            "title": ("タイトル", form.title),
+            "vendor": ("取引先", form.vendor),
+            "service_name": ("製品・サービス名", form.service_name),
+            "amount": (
+                "金額",
+                f"{form.amount:,.0f}円" if form.amount is not None else "-",
+            ),
+            "approval_category_no": ("決裁科目番号", form.approval_category_no),
+        }
+        label, value = labels.get(target_field, ("決裁案", ""))
+        return f"{label}を更新しました。\n\n{value or '-'}"
 
     def _save_generated_output(self, case: CaseRecord) -> None:
         path = f"cases/{case.case_id}/versions/{case.current_version}.json"

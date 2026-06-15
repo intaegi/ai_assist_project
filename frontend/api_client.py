@@ -5,7 +5,9 @@ import requests
 
 
 class ApiError(RuntimeError):
-    pass
+    def __init__(self, message: str, status_code: int | None = None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class ApiClient:
@@ -23,7 +25,7 @@ class ApiClient:
                 detail = response.json().get("detail", response.text)
             except ValueError:
                 detail = response.text
-            raise ApiError(str(detail))
+            raise ApiError(str(detail), response.status_code)
         if response.status_code == 204:
             return None
         return response.json()

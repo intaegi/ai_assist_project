@@ -1,4 +1,5 @@
 import json
+import re
 from typing import Any
 
 from openai import AzureOpenAI
@@ -27,6 +28,7 @@ class LocalAIService:
         extracted_fields: dict[str, Any],
         references: list[dict[str, Any]],
         required_documents: list[str],
+        instruction: str = "",
     ) -> GenerationPayload:
         vendor = str(extracted_fields.get("vendor", ""))
         service = str(extracted_fields.get("service_name", ""))
@@ -36,8 +38,14 @@ class LocalAIService:
         body = description.strip()
         if references:
             body += "\n\n社内基準と類似事例を参照し、添付資料の確認結果を反映しています。"
+        if instruction and instruction != "initial_generation":
+            body += f"\n\n追加反映指示: {instruction}"
         return GenerationPayload(
-            summary=description[:160],
+            summary=(
+                f"{description[:120]} / 追加反映: {instruction[:80]}"
+                if instruction and instruction != "initial_generation"
+                else description[:160]
+            ),
             extracted_fields=extracted_fields,
             approval_form=ApprovalForm(
                 title=f"{title}に関する決裁",
@@ -53,12 +61,28 @@ class LocalAIService:
 
     def revise(self, form: ApprovalForm, instruction: str, target_field: str) -> ApprovalForm:
         updated = form.model_copy(deep=True)
+        if target_field == "form":
+            updated.body = f"{updated.body}\n\nフォーム全体への修正指示: {instruction}".strip()
+            return updated
         if target_field == "body":
-            if "3文" in instruction:
+            sentence_count = re.search(r"(\d+)\s*文", instruction)
+            if sentence_count:
                 sentences = [part.strip() for part in updated.body.replace("。", "。\n").splitlines() if part.strip()]
-                updated.body = "".join(sentences[:3])
+                limit = max(1, int(sentence_count.group(1)))
+                updated.body = "".join(sentences[:limit])
             else:
                 updated.body = f"{updated.body}\n\n修正指示: {instruction}".strip()
+        elif target_field in {"title", "vendor", "service_name", "approval_category_no"}:
+            setattr(updated, target_field, instruction.strip())
+        elif target_field == "amount":
+            match = re.search(r"[\d,]+", instruction)
+            if match:
+                updated.amount = float(match.group(0).replace(",", ""))
+        elif target_field == "service_period":
+            dates = re.findall(r"20\d{2}-\d{1,2}-\d{1,2}", instruction)
+            if len(dates) >= 2:
+                updated.service_start_date = dates[0]
+                updated.service_end_date = dates[1]
         return updated
 
     def verify_checklist(
@@ -150,6 +174,7 @@ class AzureAIService:
         extracted_fields: dict[str, Any],
         references: list[dict[str, Any]],
         required_documents: list[str],
+        instruction: str = "",
     ) -> GenerationPayload:
         request = {
             "description": description,
@@ -157,6 +182,7 @@ class AzureAIService:
             "pre_extracted_fields": extracted_fields,
             "references": references[:5],
             "required_documents": required_documents,
+            "additional_instruction": instruction,
             "output_schema": GenerationPayload.model_json_schema(),
         }
         messages = [
@@ -184,13 +210,27 @@ class AzureAIService:
             "target_field": target_field,
             "output_schema": ApprovalForm.model_json_schema(),
         }
-        result = self._json_completion(
-            [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
-            ]
+        result = ApprovalForm.model_validate(
+            self._json_completion(
+                [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": json.dumps(payload, ensure_ascii=False)},
+                ]
+            )
         )
-        return ApprovalForm.model_validate(result)
+        if target_field == "form":
+            return result
+
+        updated = form.model_copy(deep=True)
+        fields = (
+            ("service_start_date", "service_end_date")
+            if target_field == "service_period"
+            else (target_field,)
+        )
+        for field in fields:
+            if field in ApprovalForm.model_fields:
+                setattr(updated, field, getattr(result, field))
+        return updated
 
     def verify_checklist(
         self,

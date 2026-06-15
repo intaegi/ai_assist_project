@@ -20,6 +20,7 @@ def test_health(client):
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
+    assert "checklist_verification" in response.json()["features"]
 
 
 def test_dependency_health_reports_local_mode(client):
@@ -79,14 +80,18 @@ def test_patch_auto_saves_form(client):
 
 def test_chat_creates_new_version(client):
     case = create_case(client)
-    client.post(f"/cases/{case['case_id']}/generate")
+    generated = client.post(f"/cases/{case['case_id']}/generate").json()
     response = client.post(
         f"/cases/{case['case_id']}/chat",
-        json={"instruction": "本文を3文以内にしてください。", "target_field": "body"},
+        json={"instruction": "確認結果を本文末尾に追記", "target_field": "body"},
     )
     assert response.status_code == 200
     assert response.json()["current_version"] == 2
     assert len(response.json()["chat_logs"]) == 2
+    assert "確認結果を本文末尾に追記" in response.json()["approval_form"]["body"]
+    assert response.json()["approval_form"]["vendor"] == generated["approval_form"]["vendor"]
+    assert "決裁本文を更新しました" in response.json()["chat_logs"][-1]["message"]
+    assert "確認結果を本文末尾に追記" in response.json()["chat_logs"][-1]["message"]
 
 
 def test_clone_creates_editable_case(client):
@@ -217,6 +222,8 @@ def test_regeneration_instruction_is_saved_as_new_version(client):
     payload = response.json()
     assert payload["current_version"] == 2
     assert payload["versions"][-1]["instruction"] == "追加請求書を反映して再作成"
+    assert "追加請求書を反映して再作成" in payload["summary"]
+    assert "追加請求書を反映して再作成" in payload["approval_form"]["body"]
 
 
 def test_ai_checklist_verification_is_saved(client):
@@ -236,6 +243,28 @@ def test_ai_checklist_verification_is_saved(client):
     assert any(item["status"] == "action_required" for item in results)
     invoice_check = next(item for item in results if "請求書" in item["item"])
     assert invoice_check["status"] == "action_required"
+
+
+def test_chat_can_regenerate_entire_case(client):
+    case = create_case(client)
+    generated = client.post(f"/cases/{case['case_id']}/generate").json()
+
+    response = client.post(
+        f"/cases/{case['case_id']}/chat",
+        json={
+            "instruction": "追加資料を反映して全体を更新してください。",
+            "target_field": "all",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["current_version"] == generated["current_version"] + 1
+    assert "追加資料を反映して全体を更新してください。" in payload["summary"]
+    assert payload["chat_logs"][-2]["target_field"] == "all"
+    assert payload["versions"][-1]["instruction"] == (
+        "追加資料を反映して全体を更新してください。"
+    )
 
 
 def test_requirement_setting_can_be_updated(client):

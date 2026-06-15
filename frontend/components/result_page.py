@@ -12,6 +12,48 @@ from frontend.api_client import ApiError
 from frontend.document_comparison import build_comparison_rows
 
 
+FORM_STATE_FIELDS = (
+    "title",
+    "vendor",
+    "service_name",
+    "service_start_date",
+    "service_end_date",
+    "amount",
+    "approval_category_no",
+    "body",
+    "required_documents",
+)
+
+REVISION_TARGETS = {
+    "決裁本文": "body",
+    "決裁フォーム全体": "form",
+    "決裁案全体（フォーム・要約・チェックリスト）": "all",
+    "タイトル": "title",
+    "取引先": "vendor",
+    "製品・サービス名": "service_name",
+    "利用期間": "service_period",
+    "金額": "amount",
+    "決裁科目番号": "approval_category_no",
+}
+
+
+def _revision_target_label(target_field: str) -> str:
+    return next(
+        (
+            label
+            for label, value in REVISION_TARGETS.items()
+            if value == target_field
+        ),
+        target_field,
+    )
+
+
+def _clear_form_state(case_id: str) -> None:
+    prefix = f"form_{case_id}_"
+    for field in FORM_STATE_FIELDS:
+        st.session_state.pop(prefix + field, None)
+
+
 def _format_datetime(value: str | None) -> str:
     if not value:
         return "-"
@@ -194,6 +236,7 @@ def _render_document_recovery(client, case: dict) -> None:
                             instruction.strip()
                             or "追加書類を反映して決裁案を再作成",
                         )
+                    _clear_form_state(case["case_id"])
                     status.update(
                         label="追加書類の再確認が完了しました",
                         state="complete",
@@ -223,7 +266,13 @@ def _render_checklist(client, case: dict) -> None:
                 client.verify_checklist(case["case_id"])
             st.rerun()
         except ApiError as exc:
-            st.error(str(exc))
+            if exc.status_code == 404:
+                st.error(
+                    "チェックリスト確認APIが見つかりません。"
+                    "FastAPIを最新コードで再起動してください。"
+                )
+            else:
+                st.error(str(exc))
 
     verification = {
         item["item"]: item
@@ -401,11 +450,46 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
 
     st.markdown("---")
     st.subheader("AIへの修正依頼")
-    instruction = st.chat_input("例: 決裁本文を承認者向けに3文以内へ短縮してください。")
-    if instruction:
+    chat_logs = case.get("chat_logs", [])
+    if chat_logs:
+        st.markdown("#### 修正チャット履歴")
+        for log in chat_logs:
+            role = log.get("role", "assistant")
+            with st.chat_message(role if role in {"user", "assistant"} else "assistant"):
+                target = _revision_target_label(log.get("target_field", ""))
+                if target:
+                    st.caption(f"修正対象: {target}")
+                st.write(log.get("message", ""))
+
+    with st.form(f"revision_form_{case_id}", clear_on_submit=True):
+        target_label = st.selectbox(
+            "修正対象",
+            list(REVISION_TARGETS),
+            key=f"revision_target_{case_id}",
+        )
+        instruction = st.text_area(
+            "修正内容",
+            placeholder="例: 決裁本文を承認者向けに1文へまとめてください。",
+            key=f"revision_instruction_{case_id}",
+        )
+        submitted = st.form_submit_button(
+            "AIに修正を依頼",
+            type="primary",
+            use_container_width=True,
+        )
+
+    if submitted:
+        if not instruction.strip():
+            st.warning("修正内容を入力してください。")
+            return
         try:
             with st.spinner("最新案を作成しています"):
-                client.chat(case_id, instruction)
+                client.chat(
+                    case_id,
+                    instruction.strip(),
+                    REVISION_TARGETS[target_label],
+                )
+            _clear_form_state(case_id)
             st.rerun()
         except ApiError as exc:
             st.error(str(exc))

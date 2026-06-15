@@ -63,12 +63,19 @@ st.markdown(
 client = ApiClient()
 if not st.session_state.get("backend_health_checked"):
     try:
-        client.health()
+        backend_health = client.health()
         st.session_state.backend_health_checked = True
+        st.session_state.backend_features = backend_health.get("features", [])
     except ApiError as exc:
         st.error(str(exc))
         st.code("uvicorn backend.app.main:app --reload --port 8000")
         st.stop()
+
+if "checklist_verification" not in st.session_state.get("backend_features", []):
+    st.warning(
+        "FastAPIが旧バージョンで起動しています。"
+        "チェックリストAI確認を利用するにはバックエンドを再起動してください。"
+    )
 
 page, case_id = render_sidebar(client, st.session_state.get("case_id"))
 

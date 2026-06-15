@@ -135,6 +135,138 @@ def _render_copy_button(form: dict) -> None:
     )
 
 
+def _render_field_copy_button(
+    label: str,
+    value: object,
+    compact: bool = False,
+) -> None:
+    text = "" if value is None else str(value)
+    serialized = json.dumps(text, ensure_ascii=False).replace("</", "<\\/")
+    safe_label = html.escape(label)
+    button_text = "Copy" if compact else "コピー"
+    components.html(
+        f"""
+        <button
+          id="copy-field"
+          type="button"
+          title="{safe_label}をコピー"
+          aria-label="{safe_label}をコピー"
+        >{button_text}</button>
+        <span id="copy-result" aria-live="polite"></span>
+        <script>
+          const button = document.getElementById("copy-field");
+          const result = document.getElementById("copy-result");
+          button.addEventListener("click", async () => {{
+            const text = {serialized};
+            try {{
+              await navigator.clipboard.writeText(text);
+            }} catch (error) {{
+              const area = document.createElement("textarea");
+              area.value = text;
+              document.body.appendChild(area);
+              area.select();
+              document.execCommand("copy");
+              area.remove();
+            }}
+            result.textContent = "完了";
+          }});
+        </script>
+        <style>
+          body {{
+            margin: 0;
+            padding-top: 29px;
+            font-family: sans-serif;
+            white-space: nowrap;
+          }}
+          button {{
+            width: 100%;
+            min-height: 38px;
+            padding: 0 2px;
+            border: 1px solid #b9c2cf;
+            border-radius: 6px;
+            color: #1769aa;
+            background: #fff;
+            cursor: pointer;
+            font-size: 11px;
+          }}
+          button:hover {{ background: #eef6fb; border-color: #1769aa; }}
+          button:focus {{ outline: 2px solid #80b7df; outline-offset: 1px; }}
+          span {{
+            display: block;
+            margin-top: 2px;
+            color: #17603a;
+            font-size: 11px;
+            text-align: center;
+          }}
+        </style>
+        """,
+        height=76,
+    )
+
+
+def _text_input_with_copy(
+    input_col,
+    copy_col,
+    label: str,
+    value: str,
+    key: str,
+    common: dict,
+    compact: bool = False,
+) -> None:
+    input_col.text_input(label, value=value, key=key, **common)
+    with copy_col:
+        _render_field_copy_button(
+            label,
+            st.session_state.get(key, value),
+            compact=compact,
+        )
+
+
+def _number_input_with_copy(
+    input_col,
+    copy_col,
+    label: str,
+    value: float,
+    key: str,
+    common: dict,
+    compact: bool = False,
+) -> None:
+    input_col.number_input(
+        label,
+        value=value,
+        min_value=0.0,
+        step=1000.0,
+        key=key,
+        **common,
+    )
+    with copy_col:
+        current = st.session_state.get(key, value)
+        copy_value = f"{float(current):g}" if current is not None else ""
+        _render_field_copy_button(label, copy_value, compact=compact)
+
+
+def _copyable_text_input(
+    label: str,
+    value: str,
+    key: str,
+    common: dict,
+) -> None:
+    input_col, copy_col = st.columns([8, 1.5], gap="small")
+    _text_input_with_copy(input_col, copy_col, label, value, key, common)
+
+
+def _copyable_text_area(
+    label: str,
+    value: str,
+    key: str,
+    common: dict,
+) -> None:
+    input_col, copy_col = st.columns([8, 1.5], gap="small")
+    input_col.text_area(label, value=value, height=220, key=key, **common)
+    with copy_col:
+        _render_field_copy_button(label, st.session_state.get(key, value))
+
+
 def _save_form(client, case_id: str) -> None:
     prefix = f"form_{case_id}_"
     payload = {
@@ -366,29 +498,84 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
     with form_col:
         st.subheader("AI生成決裁フォーム")
         common = {"on_change": _save_form, "args": (client, case_id)}
-        st.text_input("タイトル", value=form.get("title", ""), key=prefix + "title", **common)
-        c1, c2 = st.columns(2)
-        c1.text_input("取引先", value=form.get("vendor", ""), key=prefix + "vendor", **common)
-        c2.text_input("製品・サービス名", value=form.get("service_name", ""), key=prefix + "service_name", **common)
-        c1, c2 = st.columns(2)
-        c1.text_input("利用開始日", value=form.get("service_start_date") or "", key=prefix + "service_start_date", **common)
-        c2.text_input("利用終了日", value=form.get("service_end_date") or "", key=prefix + "service_end_date", **common)
-        c1, c2 = st.columns(2)
-        c1.number_input(
+        _copyable_text_input(
+            "タイトル",
+            form.get("title", ""),
+            prefix + "title",
+            common,
+        )
+        vendor_input, vendor_copy, service_input, service_copy = st.columns(
+            [4, 1.25, 4, 1.25],
+            gap="small",
+        )
+        _text_input_with_copy(
+            vendor_input,
+            vendor_copy,
+            "取引先",
+            form.get("vendor", ""),
+            prefix + "vendor",
+            common,
+            compact=True,
+        )
+        _text_input_with_copy(
+            service_input,
+            service_copy,
+            "製品・サービス名",
+            form.get("service_name", ""),
+            prefix + "service_name",
+            common,
+            compact=True,
+        )
+        start_input, start_copy, end_input, end_copy = st.columns(
+            [4, 1.25, 4, 1.25],
+            gap="small",
+        )
+        _text_input_with_copy(
+            start_input,
+            start_copy,
+            "利用開始日",
+            form.get("service_start_date") or "",
+            prefix + "service_start_date",
+            common,
+            compact=True,
+        )
+        _text_input_with_copy(
+            end_input,
+            end_copy,
+            "利用終了日",
+            form.get("service_end_date") or "",
+            prefix + "service_end_date",
+            common,
+            compact=True,
+        )
+        amount_input, amount_copy, category_input, category_copy = st.columns(
+            [4, 1.25, 4, 1.25],
+            gap="small",
+        )
+        _number_input_with_copy(
+            amount_input,
+            amount_copy,
             "金額",
-            value=float(form.get("amount") or 0),
-            min_value=0.0,
-            step=1000.0,
-            key=prefix + "amount",
-            **common,
+            float(form.get("amount") or 0),
+            prefix + "amount",
+            common,
+            compact=True,
         )
-        c2.text_input(
+        _text_input_with_copy(
+            category_input,
+            category_copy,
             "決裁科目番号",
-            value=form.get("approval_category_no", ""),
-            key=prefix + "approval_category_no",
-            **common,
+            form.get("approval_category_no", ""),
+            prefix + "approval_category_no",
+            common,
+            compact=True,
         )
-        st.text_area("決裁本文", value=form.get("body", ""), height=220, key=prefix + "body", **common)
+        _copyable_text_area(
+            "決裁本文",
+            form.get("body", ""),
+            prefix + "body",
+            common,
+        )
         st.session_state[prefix + "required_documents"] = form.get("required_documents", [])
         current_form = {
             "title": st.session_state.get(prefix + "title", form.get("title", "")),

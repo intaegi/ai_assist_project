@@ -7,6 +7,9 @@ def test_new_case_has_single_primary_action():
     assert "NEW REQUEST" not in source
     assert "一時保存" not in source
     assert "作成完了" not in source
+    assert '<h1 class="page-title">新規決裁作成</h1>' in source
+    assert "📋 作成前の準備事項" in source
+    assert "□ 作成前の準備事項" not in source
 
 
 def test_result_uses_revision_form_and_chat_history_without_save_button():
@@ -86,10 +89,15 @@ def test_material_registration_is_single_item_and_clears_form():
     assert "登録する基準資料を選択してください。" in source
     assert "Path(material.name).stem" in source
     assert "Azure AI Searchへは送信されていません" in source
+    assert "検索結果が古い場合" in source
+    assert "毎回押す必要はありません" in source
+    assert "🔄 検索インデックスを手動更新" in source
 
 
 def test_settings_labels_explain_rule_formats():
     source = Path("frontend/components/settings_page.py").read_text(encoding="utf-8")
+    assert "app-page-kicker" not in source
+    assert '<h1 class="page-title">初期設定</h1>' in source
     assert "必須入力項目（1行につき キー|表示名|入力型）" in source
     assert "条件付き書類（1行につき 書類名|条件）" in source
     assert "キーは内部ID、表示名はAI生成フォームの項目名" in source
@@ -100,12 +108,19 @@ def test_settings_labels_explain_rule_formats():
 def test_sidebar_marks_current_page_as_primary():
     source = Path("frontend/components/sidebar.py").read_text(encoding="utf-8")
     assert 'type="primary" if page == "settings" else "secondary"' in source
+    assert 'type="primary" if page == "new" else "secondary"' in source
+    assert "on_click=_select_new_page" in source
+    assert "on_click=_select_settings_page" in source
+    assert "📝 新規作成" in source
+    assert "⚙️ 初期設定" in source
     assert "history_show_more" in source
     assert "history-icon" not in source
     assert 'st.query_params.get("case_id")' in source
     assert 'class="history-item{active_class}"' in source
     assert 'class="history-title"' in source
     assert 'class="history-time"' in source
+    assert "history-more-button-marker" in source
+    assert "▾ もっと見る" in source
     assert 'href = "?case_id=' not in source
     assert 'st.rerun()' not in source
 
@@ -114,6 +129,10 @@ def test_global_css_keeps_settings_inputs_and_history_readable():
     source = Path("frontend/app.py").read_text(encoding="utf-8")
     assert '[data-testid="stSidebar"] div[data-testid="stButton"] button p' in source
     assert "white-space: pre-line;" in source
+    assert ".page-title" in source
+    assert "font-weight: 700 !important;" in source
+    assert "history-more-button-marker" in source
+    assert "button:focus-visible" in source
     assert 'button[data-baseweb="tab"] p' in source
     assert 'div[data-testid="stTextArea"] textarea' in source
     assert 'div[data-testid="stFileUploader"] section' in source

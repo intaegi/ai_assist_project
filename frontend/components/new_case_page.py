@@ -10,7 +10,7 @@ APPROVAL_TYPES = ["購入", "支払", "契約", "出張・イベント", "その
 
 
 def render_new_case_page(client) -> str | None:
-    st.title("新規決裁作成")
+    st.markdown('<h1 class="page-title">新規決裁作成</h1>', unsafe_allow_html=True)
     st.caption("目的と添付書類をもとに、AIが決裁フォーム・要約・チェックリストを作成します。")
     clone = st.session_state.get("draft_clone")
     reverse_categories = {value: key for key, value in CATEGORIES.items()}
@@ -42,7 +42,7 @@ def render_new_case_page(client) -> str | None:
         requirement = {"source_status": "no_reference", "required_fields": [], "required_documents": [], "conditional_documents": []}
 
     with st.container(border=True):
-        st.subheader("□ 作成前の準備事項")
+        st.subheader("📋 作成前の準備事項")
         if requirement.get("source_status") == "no_reference":
             st.warning("このカテゴリには社内基準と過去事例が登録されていません。担当部門への確認が必要です。")
         fields = requirement.get("required_fields", [])

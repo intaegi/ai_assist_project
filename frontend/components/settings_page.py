@@ -10,11 +10,7 @@ APPROVAL_TYPES = ["購入", "支払", "契約", "出張・イベント", "その
 
 
 def render_settings_page(client) -> None:
-    st.markdown(
-        '<div class="app-page-kicker">SETTINGS</div>',
-        unsafe_allow_html=True,
-    )
-    st.title("初期設定")
+    st.markdown('<h1 class="page-title">初期設定</h1>', unsafe_allow_html=True)
     st.caption("決裁カテゴリごとの必須入力項目、必要書類、RAG基準資料を登録します。")
 
     tab_rules, tab_materials, tab_connection = st.tabs(["入力・書類基準", "基準資料", "接続確認"])
@@ -113,8 +109,12 @@ def render_settings_page(client) -> None:
                 st.success("資料を登録しました。")
             except ApiError as exc:
                 st.error(str(exc))
+        st.caption(
+            "検索結果が古い場合や、登録済み資料をまとめてAI Searchへ再送信したい場合だけ使用します。"
+            "通常の資料登録だけなら毎回押す必要はありません。"
+        )
         reindex_slot = st.empty()
-        if reindex_slot.button("検索インデックスを更新", key="reindex_materials"):
+        if reindex_slot.button("🔄 検索インデックスを手動更新", key="reindex_materials"):
             reindex_slot.empty()
             try:
                 with st.status("検索インデックスを更新しています", expanded=True) as status:

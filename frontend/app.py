@@ -113,6 +113,11 @@ st.markdown(
         box-shadow: none;
         font-weight: 600;
       }
+      [data-testid="stSidebar"] div[data-testid="stButton"] button:focus-visible {
+        border-color: var(--app-accent) !important;
+        outline: 2px solid #DDD6FE !important;
+        outline-offset: 2px;
+      }
       [data-testid="stSidebar"] div[data-testid="stButton"] button p {
         width: 100%;
         margin: 0;
@@ -132,6 +137,17 @@ st.markdown(
       [data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"]:hover {
         background: #F1F5F9;
         border-color: transparent;
+      }
+      div[data-testid="element-container"]:has(.history-more-button-marker)
+        + div[data-testid="element-container"] button {
+        border: 1px solid var(--app-border) !important;
+        background: #fff !important;
+        color: var(--app-text) !important;
+      }
+      div[data-testid="element-container"]:has(.history-more-button-marker)
+        + div[data-testid="element-container"] button:hover {
+        border-color: #C4B5FD !important;
+        background: var(--app-accent-soft) !important;
       }
       .history-item {
         display: grid;
@@ -198,6 +214,15 @@ st.markdown(
       h1 { font-size: 1.75rem !important; letter-spacing: 0; }
       h2, h3 { letter-spacing: 0; }
       h1, h2, h3, h4 { color: var(--app-text); }
+      .page-title {
+        margin: 0 0 0.6rem;
+        padding-left: 0.7rem;
+        border-left: 4px solid var(--app-accent);
+        color: var(--app-text);
+        font-size: 1.75rem;
+        line-height: 1.25;
+        font-weight: 800;
+      }
       div[data-testid="stForm"] { border: 0; padding: 0; }
       div[data-testid="stStatusWidget"] { margin-top: 0.75rem; }
       div[data-testid="stChatMessage"] {
@@ -218,8 +243,11 @@ st.markdown(
       div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
         background: transparent !important;
       }
-      div[data-testid="stWidgetLabel"] p {
-        font-weight: 700;
+      div[data-testid="stWidgetLabel"],
+      div[data-testid="stWidgetLabel"] *,
+      label[data-testid="stWidgetLabel"],
+      label[data-testid="stWidgetLabel"] * {
+        font-weight: 700 !important;
       }
       button[data-baseweb="tab"] p,
       div[data-baseweb="tab-list"] button p {

@@ -33,6 +33,18 @@ def _render_history_link(case: dict, active: bool) -> None:
     )
 
 
+def _select_new_page() -> None:
+    st.query_params.clear()
+    st.session_state.page = "new"
+    st.session_state.case_id = None
+
+
+def _select_settings_page() -> None:
+    st.query_params.clear()
+    st.session_state.page = "settings"
+    st.session_state.case_id = None
+
+
 def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]:
     page = st.session_state.get("page", "new")
     selected = active_case_id
@@ -49,17 +61,18 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
             """,
             unsafe_allow_html=True,
         )
-        if st.button("＋ 新規作成", use_container_width=True, type="primary" if page == "new" else "secondary"):
-            st.query_params.clear()
-            page = "new"
-            selected = None
-        if st.button(
-            "⚙ 初期設定",
+        st.button(
+            "📝 新規作成",
+            use_container_width=True,
+            type="primary" if page == "new" else "secondary",
+            on_click=_select_new_page,
+        )
+        st.button(
+            "⚙️ 初期設定",
             use_container_width=True,
             type="primary" if page == "settings" else "secondary",
-        ):
-            st.query_params.clear()
-            page = "settings"
+            on_click=_select_settings_page,
+        )
         st.markdown(
             """
             <div class="sidebar-section-title">
@@ -89,8 +102,9 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
             active = page == "history" and selected == case["case_id"]
             _render_history_link(case, active)
         if hidden_cases and not show_more:
+            st.markdown('<span class="history-more-button-marker"></span>', unsafe_allow_html=True)
             if st.button(
-                "＋ もっと見る",
+                "▾ もっと見る",
                 key="history_show_more_button",
                 use_container_width=True,
                 type="secondary",

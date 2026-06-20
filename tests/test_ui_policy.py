@@ -49,6 +49,16 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "作成完了" not in source
 
 
+def test_chat_message_colors_are_role_specific():
+    source = Path("frontend/app.py").read_text(encoding="utf-8")
+    assert 'chatAvatarIcon-user' in source
+    assert 'chatAvatarIcon-assistant' in source
+    assert 'div[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"])' in source
+    assert 'background: var(--app-soft);' in source
+    assert 'div[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"])' in source
+    assert 'background: #fff;' in source
+
+
 def test_streamlit_entrypoint_adds_project_root_to_python_path():
     source = Path("frontend/app.py").read_text(encoding="utf-8")
     assert "Path(__file__).resolve().parents[1]" in source

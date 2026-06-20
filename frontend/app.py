@@ -193,10 +193,23 @@ st.markdown(
       h1, h2, h3, h4 { color: var(--app-text); }
       div[data-testid="stForm"] { border: 0; padding: 0; }
       div[data-testid="stStatusWidget"] { margin-top: 0.75rem; }
-      div[data-testid="stChatMessage"] { padding: 0.75rem 1rem; }
       div[data-testid="stChatMessage"] {
+        padding: 0.75rem 1rem;
         border-radius: 0.9rem;
+        border: 1px solid var(--app-border);
+        background: #fff;
+      }
+      div[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+        border-color: transparent;
         background: var(--app-soft);
+      }
+      div[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+        border-color: var(--app-border);
+        background: #fff;
+      }
+      div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"],
+      div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
+        background: transparent !important;
       }
       div[data-testid="stWidgetLabel"] p {
         font-weight: 700;

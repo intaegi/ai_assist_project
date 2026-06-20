@@ -313,6 +313,23 @@ st.markdown(
         font-size: 1.05rem;
         font-weight: 500;
       }
+      div[data-testid="element-container"]:has(.result-pair-marker) {
+        height: 0;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+      div[data-testid="element-container"]:has(.result-pair-marker) + div[data-testid="stHorizontalBlock"] {
+        gap: 5px !important;
+        align-items: stretch;
+      }
+      div[data-testid="element-container"]:has(.result-pair-marker) + div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+      div[data-testid="element-container"]:has(.result-pair-marker) + div[data-testid="stHorizontalBlock"] div[data-testid="stVerticalBlockBorderWrapper"] {
+        height: 100%;
+      }
       @media (max-width: 900px) {
         .result-summary-grid {
           grid-template-columns: 1fr;

@@ -4,6 +4,7 @@ from pathlib import Path
 def test_new_case_has_single_primary_action():
     source = Path("frontend/components/new_case_page.py").read_text(encoding="utf-8")
     assert source.count('st.button("✨ AI決裁案を作成"') == 1
+    assert "NEW REQUEST" not in source
     assert "一時保存" not in source
     assert "作成完了" not in source
 
@@ -34,6 +35,8 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "height=120" in source
     assert "build_comparison_rows" in source
     assert "生成結果表示" in source
+    assert "result-pair-marker" in source
+    assert 'st.columns([1, 1], gap="small")' in source
     assert "結果確認" in source
     assert "AIチャット" in source
     assert "不足書類を追加して再確認" in source
@@ -86,11 +89,11 @@ def test_material_registration_is_single_item_and_clears_form():
 def test_sidebar_marks_current_page_as_primary():
     source = Path("frontend/components/sidebar.py").read_text(encoding="utf-8")
     assert 'type="primary" if page == "settings" else "secondary"' in source
-    assert 'class="history-item{active_class}"' in source
+    assert 'key=f"history_{case[\'case_id\']}"' in source
+    assert "history_show_more" in source
     assert "history-icon" not in source
-    assert 'class="history-time"' in source
     assert 'st.query_params.get("case_id")' in source
-    assert '<details class="history-more">' in source
+    assert 'href="?case_id=' not in source
     assert 'st.rerun()' not in source
 
 

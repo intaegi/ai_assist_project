@@ -578,7 +578,8 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         '<div class="app-section-heading">生成結果表示</div>',
         unsafe_allow_html=True,
     )
-    preview_col, form_col = st.columns([0.92, 1.08], gap="large")
+    st.markdown('<div class="result-pair-marker"></div>', unsafe_allow_html=True)
+    preview_col, form_col = st.columns([1, 1], gap="small")
     with preview_col:
         with st.container(border=True):
             st.subheader("📄 原本書類")

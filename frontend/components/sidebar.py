@@ -1,6 +1,5 @@
 import html
 from datetime import datetime
-from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import streamlit as st
@@ -16,18 +15,10 @@ def _format_history_time(value: str | None) -> str:
         return value
 
 
-def _history_item_html(case: dict, *, active: bool) -> str:
+def _history_button_label(case: dict) -> str:
     label = case.get("title") or case.get("description", "名称未設定")[:24]
-    active_class = " active" if active else ""
-    return (
-        f'<a class="history-item{active_class}" '
-        f'href="?case_id={quote(case["case_id"])}" target="_self">'
-        '<span>'
-        f'<span class="history-title">{html.escape(label)}</span>'
-        f'<span class="history-time">{html.escape(_format_history_time(case.get("updated_at")))}</span>'
-        "</span>"
-        "</a>"
-    )
+    updated = _format_history_time(case.get("updated_at"))
+    return f"{label}\n{updated}" if updated else label
 
 
 def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]:
@@ -81,23 +72,26 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
             st.caption("作成履歴はまだありません")
         visible_cases = generated[:4]
         hidden_cases = generated[4:]
-        history_html = "".join(
-            _history_item_html(case, active=page == "history" and selected == case["case_id"])
-            for case in visible_cases
-        )
-        if hidden_cases:
-            hidden_html = "".join(
-                _history_item_html(case, active=page == "history" and selected == case["case_id"])
-                for case in hidden_cases
-            )
-            history_html += (
-                '<details class="history-more">'
-                '<summary>＋ もっと見る</summary>'
-                f"{hidden_html}"
-                "</details>"
-            )
-        if history_html:
-            st.markdown(history_html, unsafe_allow_html=True)
+        show_more = st.session_state.get("history_show_more", False)
+        for case in visible_cases + (hidden_cases if show_more else []):
+            active = page == "history" and selected == case["case_id"]
+            if st.button(
+                _history_button_label(case),
+                key=f"history_{case['case_id']}",
+                use_container_width=True,
+                type="primary" if active else "secondary",
+            ):
+                st.query_params.clear()
+                page = "history"
+                selected = case["case_id"]
+        if hidden_cases and not show_more:
+            if st.button(
+                "＋ もっと見る",
+                key="history_show_more_button",
+                use_container_width=True,
+                type="secondary",
+            ):
+                st.session_state.history_show_more = True
         if active_case_id:
             st.markdown(
                 f'<div class="sidebar-current-case">現在の案件<br>{html.escape(active_case_id)}</div>',

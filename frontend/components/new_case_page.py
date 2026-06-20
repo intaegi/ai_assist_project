@@ -10,10 +10,6 @@ APPROVAL_TYPES = ["購入", "支払", "契約", "出張・イベント", "その
 
 
 def render_new_case_page(client) -> str | None:
-    st.markdown(
-        '<div class="app-page-kicker">NEW REQUEST</div>',
-        unsafe_allow_html=True,
-    )
     st.title("新規決裁作成")
     st.caption("目的と添付書類をもとに、AIが決裁フォーム・要約・チェックリストを作成します。")
     clone = st.session_state.get("draft_clone")

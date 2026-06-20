@@ -235,8 +235,18 @@ class AzureBlobStore:
     def __init__(self, settings: Settings):
         self.settings = settings
         self.client = BlobServiceClient.from_connection_string(settings.azure_storage_connection_string)
+        self._known_containers: set[str] = set()
+
+    def _ensure_container(self, container: str) -> None:
+        if container in self._known_containers:
+            return
+        container_client = self.client.get_container_client(container)
+        if not container_client.exists():
+            container_client.create_container()
+        self._known_containers.add(container)
 
     def upload(self, container: str, path: str, content: bytes, content_type: str) -> str:
+        self._ensure_container(container)
         blob = self.client.get_blob_client(container=container, blob=path)
         blob.upload_blob(
             content,
@@ -266,6 +276,7 @@ class AzureBlobStore:
         prefix: str,
         documents: list[dict[str, Any]],
     ) -> int:
+        self._ensure_container(container)
         container_client = self.client.get_container_client(container)
         expected = set()
         for document in documents:

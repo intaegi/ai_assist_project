@@ -25,8 +25,12 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-      .block-container { padding-top: 3.75rem; padding-bottom: 3rem; max-width: 1500px; }
-      [data-testid="stSidebar"] { border-right: 1px solid #d9dee7; }
+      .stApp { background: #f7f9fc; }
+      .block-container { padding-top: 3.75rem; padding-bottom: 3rem; max-width: 1540px; }
+      [data-testid="stSidebar"] {
+        background: #f3f7fb;
+        border-right: 1px solid #d9dee7;
+      }
       [data-stale="true"] { opacity: 1 !important; }
       .history-item {
         display: block;
@@ -53,11 +57,33 @@ st.markdown(
       }
       h1 { font-size: 1.75rem !important; letter-spacing: 0; }
       h2, h3 { letter-spacing: 0; }
+      h1, h2, h3, h4 { color: #172033; }
       div[data-testid="stForm"] { border: 0; padding: 0; }
       div[data-testid="stStatusWidget"] { margin-top: 0.75rem; }
       div[data-testid="stChatMessage"] { padding: 0.75rem 1rem; }
+      div[data-testid="stVerticalBlockBorderWrapper"] {
+        border-radius: 14px;
+        border-color: #d9e2ec;
+        background: #ffffff;
+        box-shadow: 0 8px 22px rgba(23, 32, 51, 0.04);
+      }
+      div[data-testid="stAlert"] {
+        border-radius: 12px;
+      }
+      div[data-testid="stTextInput"] input,
+      div[data-testid="stNumberInput"] input,
+      textarea,
+      div[data-baseweb="select"] > div {
+        border-radius: 8px;
+      }
       div[data-testid="stFormSubmitButton"] button { min-height: 2.75rem; }
       button[kind="primary"] { background: #1769aa; border-color: #1769aa; }
+      .section-kicker {
+        color: #667085;
+        font-size: 0.86rem;
+        margin-top: -0.25rem;
+        margin-bottom: 0.75rem;
+      }
     </style>
     """,
     unsafe_allow_html=True,

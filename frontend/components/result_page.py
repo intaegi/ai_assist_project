@@ -270,7 +270,7 @@ def _copyable_text_input(
     key: str,
     common: dict,
 ) -> None:
-    input_col, copy_col = st.columns([8, 1.5], gap="small")
+    input_col, copy_col = st.columns([9, 1], gap="small")
     _text_input_with_copy(input_col, copy_col, label, value, key, common)
 
 
@@ -280,7 +280,7 @@ def _copyable_text_area(
     key: str,
     common: dict,
 ) -> None:
-    input_col, copy_col = st.columns([8, 1.5], gap="small")
+    input_col, copy_col = st.columns([9, 1], gap="small")
     input_col.text_area(label, value=value, height=220, key=key, **common)
     with copy_col:
         _render_field_copy_button(label, st.session_state.get(key, value))
@@ -507,159 +507,170 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         except ApiError as exc:
             st.error(str(exc))
 
-    preview_col, form_col = st.columns([1.05, 1], gap="large")
+    preview_col, form_col = st.columns([0.92, 1.08], gap="large")
     with preview_col:
         st.subheader("原本書類")
+        st.caption("AIが参照した原本を確認できます。")
         _render_preview(client, case)
 
     form = case.get("approval_form", {})
     prefix = f"form_{case_id}_"
     with form_col:
-        st.subheader("AI生成決裁フォーム")
-        common = {"on_change": _save_form, "args": (client, case_id)}
-        _copyable_text_input(
-            "タイトル",
-            form.get("title", ""),
-            prefix + "title",
-            common,
-        )
-        vendor_input, vendor_copy, service_input, service_copy = st.columns(
-            [4, 1.25, 4, 1.25],
-            gap="small",
-        )
-        _text_input_with_copy(
-            vendor_input,
-            vendor_copy,
-            "取引先",
-            form.get("vendor", ""),
-            prefix + "vendor",
-            common,
-            compact=True,
-        )
-        _text_input_with_copy(
-            service_input,
-            service_copy,
-            "製品・サービス名",
-            form.get("service_name", ""),
-            prefix + "service_name",
-            common,
-            compact=True,
-        )
-        start_input, start_copy, end_input, end_copy = st.columns(
-            [4, 1.25, 4, 1.25],
-            gap="small",
-        )
-        _text_input_with_copy(
-            start_input,
-            start_copy,
-            "利用開始日",
-            form.get("service_start_date") or "",
-            prefix + "service_start_date",
-            common,
-            compact=True,
-        )
-        _text_input_with_copy(
-            end_input,
-            end_copy,
-            "利用終了日",
-            form.get("service_end_date") or "",
-            prefix + "service_end_date",
-            common,
-            compact=True,
-        )
-        amount_input, amount_copy, category_input, category_copy = st.columns(
-            [4, 1.25, 4, 1.25],
-            gap="small",
-        )
-        _number_input_with_copy(
-            amount_input,
-            amount_copy,
-            "金額",
-            float(form.get("amount") or 0),
-            prefix + "amount",
-            common,
-            compact=True,
-        )
-        _text_input_with_copy(
-            category_input,
-            category_copy,
-            "決裁科目番号",
-            form.get("approval_category_no", ""),
-            prefix + "approval_category_no",
-            common,
-            compact=True,
-        )
-        _copyable_text_area(
-            "決裁本文",
-            form.get("body", ""),
-            prefix + "body",
-            common,
-        )
-        st.session_state[prefix + "required_documents"] = form.get("required_documents", [])
-        current_form = {
-            "title": st.session_state.get(prefix + "title", form.get("title", "")),
-            "vendor": st.session_state.get(prefix + "vendor", form.get("vendor", "")),
-            "service_name": st.session_state.get(prefix + "service_name", form.get("service_name", "")),
-            "service_start_date": st.session_state.get(
+        with st.container(border=True):
+            st.subheader("AI生成決裁フォーム")
+            st.markdown(
+                '<div class="section-kicker">AIが抽出した値です。右側のアイコンで個別コピーできます。</div>',
+                unsafe_allow_html=True,
+            )
+            common = {"on_change": _save_form, "args": (client, case_id)}
+            _copyable_text_input(
+                "タイトル",
+                form.get("title", ""),
+                prefix + "title",
+                common,
+            )
+            vendor_input, vendor_copy, service_input, service_copy = st.columns(
+                [4.8, 0.8, 4.8, 0.8],
+                gap="small",
+            )
+            _text_input_with_copy(
+                vendor_input,
+                vendor_copy,
+                "取引先",
+                form.get("vendor", ""),
+                prefix + "vendor",
+                common,
+                compact=True,
+            )
+            _text_input_with_copy(
+                service_input,
+                service_copy,
+                "製品・サービス名",
+                form.get("service_name", ""),
+                prefix + "service_name",
+                common,
+                compact=True,
+            )
+            start_input, start_copy, end_input, end_copy = st.columns(
+                [4.8, 0.8, 4.8, 0.8],
+                gap="small",
+            )
+            _text_input_with_copy(
+                start_input,
+                start_copy,
+                "利用開始日",
+                form.get("service_start_date") or "",
                 prefix + "service_start_date",
-                form.get("service_start_date"),
-            ),
-            "service_end_date": st.session_state.get(prefix + "service_end_date", form.get("service_end_date")),
-            "amount": st.session_state.get(prefix + "amount", form.get("amount")),
-            "approval_category_no": st.session_state.get(
-                prefix + "approval_category_no",
+                common,
+                compact=True,
+            )
+            _text_input_with_copy(
+                end_input,
+                end_copy,
+                "利用終了日",
+                form.get("service_end_date") or "",
+                prefix + "service_end_date",
+                common,
+                compact=True,
+            )
+            amount_input, amount_copy, category_input, category_copy = st.columns(
+                [4.8, 0.8, 4.8, 0.8],
+                gap="small",
+            )
+            _number_input_with_copy(
+                amount_input,
+                amount_copy,
+                "金額",
+                float(form.get("amount") or 0),
+                prefix + "amount",
+                common,
+                compact=True,
+            )
+            _text_input_with_copy(
+                category_input,
+                category_copy,
+                "決裁科目番号",
                 form.get("approval_category_no", ""),
-            ),
-            "body": st.session_state.get(prefix + "body", form.get("body", "")),
-            "required_documents": form.get("required_documents", []),
-        }
-        _render_copy_button(current_form)
-        if message := st.session_state.pop("autosave_message", None):
-            st.caption(message)
+                prefix + "approval_category_no",
+                common,
+                compact=True,
+            )
+            _copyable_text_area(
+                "決裁本文",
+                form.get("body", ""),
+                prefix + "body",
+                common,
+            )
+            st.session_state[prefix + "required_documents"] = form.get("required_documents", [])
+            current_form = {
+                "title": st.session_state.get(prefix + "title", form.get("title", "")),
+                "vendor": st.session_state.get(prefix + "vendor", form.get("vendor", "")),
+                "service_name": st.session_state.get(prefix + "service_name", form.get("service_name", "")),
+                "service_start_date": st.session_state.get(
+                    prefix + "service_start_date",
+                    form.get("service_start_date"),
+                ),
+                "service_end_date": st.session_state.get(prefix + "service_end_date", form.get("service_end_date")),
+                "amount": st.session_state.get(prefix + "amount", form.get("amount")),
+                "approval_category_no": st.session_state.get(
+                    prefix + "approval_category_no",
+                    form.get("approval_category_no", ""),
+                ),
+                "body": st.session_state.get(prefix + "body", form.get("body", "")),
+                "required_documents": form.get("required_documents", []),
+            }
+            _render_copy_button(current_form)
+            if message := st.session_state.pop("autosave_message", None):
+                st.caption(message)
 
-    st.subheader("要約")
-    st.markdown("#### 生成内容")
-    st.write(case.get("summary") or "要約はありません。")
+    with st.container(border=True):
+        st.subheader("要約")
+        st.markdown("#### 生成内容")
+        st.write(case.get("summary") or "要約はありません。")
 
-    st.markdown("#### 書類間の記載内容比較")
-    comparison_rows = build_comparison_rows(case, current_form)
-    if comparison_rows:
-        st.dataframe(
-            comparison_rows,
-            use_container_width=True,
-            hide_index=True,
-            column_config={
-                "確認項目": st.column_config.TextColumn(width="small"),
-                "AI決裁フォーム": st.column_config.TextColumn(width="medium"),
-                "書類": st.column_config.TextColumn(width="small"),
-                "書類記載値": st.column_config.TextColumn(width="medium"),
-                "照合結果": st.column_config.TextColumn(width="small"),
-            },
-        )
-    else:
-        st.info("比較できる添付書類がありません。")
+        st.markdown("#### 書類間の記載内容比較")
+        comparison_rows = build_comparison_rows(case, current_form)
+        if comparison_rows:
+            st.dataframe(
+                comparison_rows,
+                use_container_width=True,
+                hide_index=True,
+                column_config={
+                    "確認項目": st.column_config.TextColumn(width="small"),
+                    "AI決裁フォーム": st.column_config.TextColumn(width="medium"),
+                    "書類": st.column_config.TextColumn(width="small"),
+                    "書類記載値": st.column_config.TextColumn(width="medium"),
+                    "照合結果": st.column_config.TextColumn(width="small"),
+                },
+            )
+        else:
+            st.info("比較できる添付書類がありません。")
 
-    st.markdown("#### 不足・注意")
-    if message := st.session_state.pop("document_recovery_message", None):
-        st.success(message)
-    for item in case.get("resolution_notices", []):
-        st.success(item["message"])
-    for item in case.get("validation_results", []):
-        renderer = {
-            "error": st.error,
-            "warning": st.warning,
-            "info": st.info,
-            "success": st.success,
-        }[item["severity"]]
-        renderer(item["message"])
-    _render_document_recovery(client, case)
+    with st.container(border=True):
+        st.markdown("#### 不足・注意")
+        if message := st.session_state.pop("document_recovery_message", None):
+            st.success(message)
+        for item in case.get("resolution_notices", []):
+            st.success(item["message"])
+        for item in case.get("validation_results", []):
+            renderer = {
+                "error": st.error,
+                "warning": st.warning,
+                "info": st.info,
+                "success": st.success,
+            }[item["severity"]]
+            renderer(item["message"])
+        _render_document_recovery(client, case)
 
-    st.markdown("#### チェックリスト")
-    _render_checklist(client, case)
+    with st.container(border=True):
+        st.markdown("#### チェックリスト")
+        st.caption("フォームと添付書類を照合し、確認済みにできる項目をAIで判定します。")
+        _render_checklist(client, case)
 
-    st.markdown("#### 必要書類")
-    documents = current_form.get("required_documents", [])
-    st.write("、".join(documents) if documents else "AIが必要書類を特定できませんでした。")
+    with st.container(border=True):
+        st.markdown("#### 必要書類")
+        documents = current_form.get("required_documents", [])
+        st.write("、".join(documents) if documents else "AIが必要書類を特定できませんでした。")
 
     with st.expander("詳細情報", expanded=False):
         st.markdown("#### 類似決裁")
@@ -688,6 +699,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
 
     st.markdown("---")
     st.subheader("AIへの修正依頼")
+    st.caption("修正対象を選んで依頼すると、AI生成フォームと修正チャット履歴へ反映されます。")
     input_version_key = f"revision_input_version_{case_id}"
     input_version = st.session_state.get(input_version_key, 0)
     instruction_key = f"revision_instruction_{case_id}_{input_version}"

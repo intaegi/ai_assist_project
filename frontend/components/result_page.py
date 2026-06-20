@@ -610,7 +610,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             st.error(str(exc))
 
     st.markdown(
-        '<div class="app-section-heading"><span class="app-section-number">01</span>生成結果表示</div>',
+        '<div class="app-section-heading">生成結果表示</div>',
         unsafe_allow_html=True,
     )
     preview_col, form_col = st.columns([0.92, 1.08], gap="large")
@@ -731,7 +731,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
                 st.caption(message)
 
     st.markdown(
-        '<div class="app-section-heading"><span class="app-section-number">02</span>結果確認</div>',
+        '<div class="app-section-heading">結果確認</div>',
         unsafe_allow_html=True,
     )
     _render_confirmation_summary(case, current_form)
@@ -807,7 +807,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             st.divider()
 
     st.markdown(
-        '<div class="app-section-heading"><span class="app-section-number">03</span>AIチャット</div>',
+        '<div class="app-section-heading">AIチャット</div>',
         unsafe_allow_html=True,
     )
     st.subheader("💬 AIへの相談・修正")

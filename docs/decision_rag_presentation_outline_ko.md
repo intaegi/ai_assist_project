@@ -26,13 +26,13 @@
 flowchart LR
     User["사용자"] --> UI["Streamlit<br/>프론트엔드"]
     UI --> API["FastAPI<br/>백엔드"]
-    API --> Blob["Azure Blob Storage<br/>업로드 파일 저장"]
-    API --> Cosmos["Azure Cosmos DB<br/>결재 메타데이터/결과 저장"]
-    API --> Search["Azure AI Search<br/>과거 결재 검색"]
+    API --> Blob["Azure Blob Storage<br/>원본・기준자료 저장"]
+    API --> Store["data/database.json<br/>또는 Cosmos DB<br/>안건・이력 저장"]
+    API --> Search["Azure AI Search<br/>규정・기준・유사 결재 검색"]
     API --> AOAI["Azure OpenAI Service<br/>요약/추출/생성"]
+    Blob --> DS["Data source<br/>Skillset<br/>Indexer"]
+    DS --> Search
 
-    Blob --> Search
-    AOAI --> Search
     Search --> API
     AOAI --> API
     API --> UI
@@ -49,14 +49,13 @@ sequenceDiagram
     participant B as Blob Storage
     participant A as Azure AI Search
     participant O as Azure OpenAI
-    participant C as Cosmos DB
+    participant C as data/database.json / Cosmos DB
 
     U->>S: 결재 정보 입력 및 파일 업로드
     S->>F: 생성 요청
     F->>B: 첨부 파일 저장
-    F->>O: 문서 요약 및 항목 추출
-    F->>A: 과거 유사 결재 검색
-    A-->>F: 유사 사례 반환
+    F->>A: 규정・필요서류・유사 결재 검색
+    A-->>F: RAG 근거 반환
     F->>O: RAG 기반 결재 폼/체크리스트 생성
     F->>C: 생성 결과 저장
     F-->>S: 결과 반환
@@ -71,20 +70,20 @@ sequenceDiagram
 | 파일 업로드 | 청구서, 견적서, 계약서 등 업로드 |
 | 문서 요약 | 업로드 문서의 핵심 내용을 AI가 요약 |
 | 항목 추출 | 금액, 거래처, 날짜, 청구번호 등 추출 |
-| 유사 결재 검색 | Azure AI Search로 과거 사례 검색 |
+| RAG 검색 | Azure AI Search로 규정, 필요서류 기준, 표준 양식, 과거 사례 검색 |
 | 체크리스트 생성 | 필요 서류, 확인사항, 작업 태스크 생성 |
 | 결재 폼 생성 | 결재 시스템에 입력 가능한 형태의 초안 생성 |
-| 결과 저장 | Cosmos DB에 생성 결과와 참조 근거 저장 |
+| 결과 저장 | `data/database.json` 또는 Cosmos DB에 생성 결과와 참조 근거 저장 |
 
 ## 7. 화면 전이
 
 ```mermaid
 flowchart LR
-    A["신규 작성"] --> B["채팅/생성"]
-    B --> C["유사 결재 확인"]
-    C --> D["결재 폼 확인"]
-    D --> E["체크리스트 확인"]
-    E --> F["저장 완료"]
+    A["신규 작성"] --> B["AI 생성"]
+    B --> C["생성결과표시"]
+    C --> D["결과확인"]
+    D --> E["AI채팅 수정"]
+    E --> C
     A --> G["이력 목록"]
     G --> H["상세 화면"]
     H --> B
@@ -122,4 +121,4 @@ flowchart LR
 
 ## 10. 발표용 한 문장
 
-본 시스템은 결재 관련 서류를 업로드하면 생성AI가 문서 내용을 요약하고, Azure AI Search로 과거 유사 결재를 검색하여, 결재 입력 폼 초안과 확인 체크리스트를 자동 생성하는 RAG 기반 업무효율화 애플리케이션입니다.
+본 시스템은 결재 관련 서류를 업로드하면 생성AI가 문서 내용을 요약하고, Azure AI Search로 규정・필요서류 기준・과거 유사 결재를 검색하여, 결재 입력 폼 초안과 확인 체크리스트를 자동 생성하는 RAG 기반 업무효율화 애플리케이션입니다.

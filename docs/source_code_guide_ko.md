@@ -209,13 +209,14 @@ UI-02 결과와 UI-03 이력 상세를 함께 처리한다.
 - 별도 저장 버튼 없이 자동 저장
 - 폼 전체 내용을 클립보드로 복사하는 버튼
 
-폼 아래의 `要約` 연속 영역:
+결과 화면은 3영역으로 나뉜다.
 
-- 생성 요약
-- 문서별 거래처, 서비스명, 금액, 이용 기간 비교표
-- 부족·주의
-- 체크리스트
-- 필요서류
+1. `生成結果表示`: 원본 파일 미리보기와 AI 생성 결재 폼을 좌우로 표시한다.
+2. `結果確認`: 부족·주의, 체크리스트, 필요서류를 요약 카드로 먼저 보여주고,
+   생성 요약, 문서별 거래처・서비스명・금액・이용 기간 비교표, 부족·주의 상세,
+   체크리스트 상세, 필요서류는 접힌 expander 안에 표시한다.
+3. `AIチャット`: 사용자가 수정 대상 셀렉트박스를 선택하지 않고 자연어로 지시한다.
+   프론트엔드는 `target_field=all`로 `/chat`을 호출하여 결재안 전체 재검토・재생성을 요청한다.
 
 부족·주의에 `upload_file` 조치가 포함되면 결과 화면에서 추가 서류와 AI 반영 지시를 입력할 수 있다.
 파일 추가 API는 저장 직후 필수서류와 조건부 서류를 다시 판정한다. 누락이 해소되면
@@ -231,14 +232,11 @@ UI-02 결과와 UI-03 이력 상세를 함께 처리한다.
 - 유사 결재
 - 수정 이력
 
-추가 수정은 `修正対象`, `修正内容`, `AIに修正を依頼`을 하나의 `st.form`에 표시한다.
+추가 수정은 `AIへの依頼内容`, `AIに相談・修正`을 하나의 `st.form`에 표시한다.
 API가 새 버전을 만든 뒤 화면을 다시 로드하며, 사용자 지시와 AI의 변경 결과는
-`修正チャット履歴`에 함께 표시한다.
-사용자는 수정 대상을 결재 본문, 폼 전체, 결재안 전체, 제목, 거래처, 서비스명, 이용 기간,
-금액, 결재과목번호 중에서 선택한다. 결재안 전체를 선택하면 현재 첨부문서와 추가 지시를 다시
-AI 생성 요청에 전달하여 폼, 요약, 체크리스트를 함께 갱신한다. 특정 필드를 선택하면 서버는
-AI 응답 중 해당 필드만 적용하여 다른 폼 값을 보존한다. 결재 본문의 `1文`, `3文` 같은
-문장 수 지시는 로컬 모드에서도 해당 문장 수로 축약한다.
+`修正チャット履歴`에 함께 표시한다. 현재 UI는 수정 대상 셀렉트박스를 숨기고 항상
+`target_field=all`로 요청하여 현재 첨부문서와 추가 지시를 다시 AI 생성 요청에 전달한다.
+이에 따라 폼, 요약, 체크리스트가 함께 갱신된다.
 
 AI 생성 결재 폼은 각 입력값 오른쪽에 개별 복사 버튼을 제공한다. 복사는 서버 값을 변경하지
 않고 현재 화면에 표시된 값을 브라우저 클립보드에 기록하며, 기존 전체 폼 복사도 함께 제공한다.
@@ -346,7 +344,7 @@ Pydantic 모델로 API 입력, AI 출력, 저장 데이터를 검증한다.
 
 - 실제 Storage Account 이름과 사용하는 Blob 컨테이너
 - AI Search 인덱스명
-- Search 등록 방식이 SDK 직접 업로드 방식이라는 점
+- AI Search Data source, Indexer, Skillset 준비 상태
 - Cosmos를 끈 경우 로컬 저장 파일 `data/database.json`
 
 ## 6. 서비스 계층
@@ -498,13 +496,14 @@ RAG 처리의 중심 오케스트레이터이다.
   -> Blob Storage 저장
   -> Cosmos DB 또는 data/database.json에 메타데이터 저장
   -> FastAPI가 PDF/MD/TXT 텍스트 추출
-  -> Azure OpenAI Embedding 생성
-  -> 검색 인덱스 갱신
-  -> Azure AI Search SDK upload_documents로 직접 색인
+  -> Blob Storage의 AI Search용 경로에 검색 원문 배치
+  -> Azure AI Search Data source, Skillset, Indexer로 청크/벡터 색인
 ```
 
-본 구현은 Azure AI Search의 Pull Indexer 방식이 아니다. 따라서 본 애플리케이션 전용
-Data source, Indexer, Skillset은 생성하지 않는다. 인덱스만 생성하고 FastAPI가 문서와 벡터를 직접 등록한다.
+현재 Azure mode의 기본 방향은 Azure AI Search의 Pull Indexer 방식이다.
+`bootstrap_azure`는 Blob Data source, Text Split/Azure OpenAI Embedding Skillset,
+Indexer를 준비하고, FastAPI는 기준 자료와 검색 대상 원문을 Blob에 저장한다.
+direct SDK 업로드 방식은 호환 옵션으로만 남긴다.
 
 ### 7.2 신규 결재 생성
 
@@ -646,5 +645,5 @@ pytest -q
 2. Blob 원본은 Storage Account의 `uploaded-documents` 컨테이너를 확인한다.
 3. 페이지별 추출 결과는 `extracted-texts`, 생성 버전은 `generated-outputs`를 확인한다.
 4. 기준 자료는 `config-materials`를 확인한다.
-5. AI Search는 `.env`의 인덱스명을 확인하며 Data source, Indexer, Skillset은 찾지 않는다.
+5. AI Search는 `.env`의 인덱스명, Data source, Indexer, Skillset을 확인한다.
 6. 직접 수정은 버전이 아니라 현재 폼 값만 변경한다는 점을 확인한다.

@@ -11,7 +11,7 @@ APPROVAL_TYPES = ["購入", "支払", "契約", "出張・イベント", "その
 
 def render_settings_page(client) -> None:
     st.markdown(
-        '<div class="app-page-kicker"><span class="app-page-icon">⚙</span>SETTINGS</div>',
+        '<div class="app-page-kicker">SETTINGS</div>',
         unsafe_allow_html=True,
     )
     st.title("初期設定")

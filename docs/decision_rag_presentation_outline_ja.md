@@ -26,13 +26,13 @@
 flowchart LR
     User["利用者"] --> UI["Streamlit<br/>フロントエンド"]
     UI --> API["FastAPI<br/>バックエンド"]
-    API --> Blob["Azure Blob Storage<br/>アップロードファイル保存"]
-    API --> Cosmos["Azure Cosmos DB<br/>決裁メタデータ・結果保存"]
-    API --> Search["Azure AI Search<br/>過去決裁検索"]
+    API --> Blob["Azure Blob Storage<br/>原本・基準資料保存"]
+    API --> Store["data/database.json<br/>または Cosmos DB<br/>案件・履歴保存"]
+    API --> Search["Azure AI Search<br/>規程・基準・類似決裁検索"]
     API --> AOAI["Azure OpenAI Service<br/>要約・抽出・生成"]
+    Blob --> DS["Data source<br/>Skillset<br/>Indexer"]
+    DS --> Search
 
-    Blob --> Search
-    AOAI --> Search
     Search --> API
     AOAI --> API
     API --> UI
@@ -49,14 +49,13 @@ sequenceDiagram
     participant B as Blob Storage
     participant A as Azure AI Search
     participant O as Azure OpenAI
-    participant C as Cosmos DB
+    participant C as data/database.json / Cosmos DB
 
     U->>S: 決裁情報入力・ファイルアップロード
     S->>F: 生成リクエスト
     F->>B: 添付ファイル保存
-    F->>O: 文書要約・項目抽出
-    F->>A: 過去の類似決裁検索
-    A-->>F: 類似事例を返却
+    F->>A: 規程・必要書類・類似決裁検索
+    A-->>F: RAG根拠を返却
     F->>O: RAGにより決裁フォーム・チェックリスト生成
     F->>C: 生成結果保存
     F-->>S: 結果返却
@@ -71,20 +70,20 @@ sequenceDiagram
 | ファイルアップロード | 請求書、見積書、契約書などをアップロードする |
 | 文書要約 | アップロード文書の重要内容をAIが要約する |
 | 項目抽出 | 金額、取引先、日付、請求番号などを抽出する |
-| 類似決裁検索 | Azure AI Searchで過去事例を検索する |
+| RAG検索 | Azure AI Searchで規程、必要書類基準、標準様式、過去事例を検索する |
 | チェックリスト生成 | 必要書類、確認事項、作業タスクを生成する |
 | 決裁フォーム生成 | 決裁システムに入力しやすい形式の草案を生成する |
-| 結果保存 | Cosmos DBに生成結果と参照根拠を保存する |
+| 結果保存 | `data/database.json`またはCosmos DBに生成結果と参照根拠を保存する |
 
 ## 7. 画面遷移
 
 ```mermaid
 flowchart LR
-    A["新規作成"] --> B["チャット・生成"]
-    B --> C["類似決裁確認"]
-    C --> D["決裁フォーム確認"]
-    D --> E["チェックリスト確認"]
-    E --> F["保存完了"]
+    A["新規作成"] --> B["AI生成"]
+    B --> C["生成結果表示"]
+    C --> D["結果確認"]
+    D --> E["AIチャット修正"]
+    E --> C
     A --> G["履歴一覧"]
     G --> H["詳細画面"]
     H --> B
@@ -122,4 +121,4 @@ flowchart LR
 
 ## 10. 発表用一文
 
-本システムは、決裁関連書類をアップロードすると、生成AIが文書内容を要約し、Azure AI Searchで過去の類似決裁を検索して、決裁入力フォーム案と確認チェックリストを自動生成するRAG型の業務効率化アプリケーションです。
+本システムは、決裁関連書類をアップロードすると、生成AIが文書内容を要約し、Azure AI Searchで規程・必要書類基準・過去の類似決裁を検索して、決裁入力フォーム案と確認チェックリストを自動生成するRAG型の業務効率化アプリケーションです。

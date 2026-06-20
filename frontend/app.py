@@ -40,7 +40,7 @@ st.markdown(
       .block-container {
         padding-top: 2.25rem;
         padding-bottom: 3.5rem;
-        max-width: 1440px;
+        max-width: 1360px;
       }
       [data-testid="stSidebar"] {
         background: var(--app-sidebar);
@@ -249,48 +249,25 @@ st.markdown(
         display: inline-flex;
         align-items: center;
         margin-bottom: 0.15rem;
-        padding-left: 0.55rem;
+        padding-left: 0.6rem;
         border-left: 4px solid var(--app-accent);
         color: #4C1D95;
         font-size: 0.78rem;
         font-weight: 800;
         letter-spacing: 0.04em;
       }
-      .app-page-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.45rem;
-        height: 1.45rem;
-        border-radius: 0.45rem;
-        color: #fff;
-        background: var(--app-accent);
-        font-size: 0.9rem;
-      }
       .app-section-heading {
         display: flex;
         align-items: center;
-        gap: 0.45rem;
-        margin: 1rem 0 0.55rem;
+        margin: 1.1rem 0 0.65rem;
+        padding-left: 0.65rem;
+        border-left: 4px solid var(--app-accent);
         color: var(--app-text);
-        font-size: 1.05rem;
-        font-weight: 800;
-      }
-      .app-section-number {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-width: 1.45rem;
-        height: 1.25rem;
-        padding: 0 0.35rem;
-        border-radius: 999px;
-        color: #fff;
-        background: var(--app-accent);
-        font-size: 0.72rem;
+        font-size: 1.08rem;
         font-weight: 800;
       }
       .result-header {
-        margin-bottom: 0.75rem;
+        margin-bottom: 0.6rem;
       }
       .result-title {
         margin: 0.2rem 0 0.15rem;
@@ -307,7 +284,7 @@ st.markdown(
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0.75rem;
-        margin: 0.3rem 0 1rem;
+        margin: 0.15rem 0 0.85rem;
       }
       .result-summary-card {
         padding: 0.85rem 1rem;

@@ -11,7 +11,7 @@ APPROVAL_TYPES = ["購入", "支払", "契約", "出張・イベント", "その
 
 def render_new_case_page(client) -> str | None:
     st.markdown(
-        '<div class="app-page-kicker"><span class="app-page-icon">＋</span>NEW REQUEST</div>',
+        '<div class="app-page-kicker">NEW REQUEST</div>',
         unsafe_allow_html=True,
     )
     st.title("新規決裁作成")

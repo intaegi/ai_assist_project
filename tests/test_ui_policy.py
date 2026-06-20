@@ -28,7 +28,10 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "_render_field_copy_button" in source
     assert "タイトルをコピー" not in source
     assert '<svg viewBox="0 0 24 24"' in source
-    assert 'role="tooltip"' in source
+    assert 'role="tooltip"' not in source
+    assert "フォームコピー" in source
+    assert "AI DRAFT" not in source
+    assert "height=120" in source
     assert "build_comparison_rows" in source
     assert "生成結果表示" in source
     assert "結果確認" in source
@@ -73,6 +76,7 @@ def test_sidebar_marks_current_page_as_primary():
     source = Path("frontend/components/sidebar.py").read_text(encoding="utf-8")
     assert 'type="primary" if page == "settings" else "secondary"' in source
     assert 'class="history-item{active_class}"' in source
+    assert "history-icon" not in source
     assert 'class="history-time"' in source
     assert 'st.query_params.get("case_id")' in source
     assert '<details class="history-more">' in source

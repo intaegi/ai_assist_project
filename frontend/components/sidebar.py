@@ -22,7 +22,6 @@ def _history_item_html(case: dict, *, active: bool) -> str:
     return (
         f'<a class="history-item{active_class}" '
         f'href="?case_id={quote(case["case_id"])}" target="_self">'
-        '<span class="history-icon">□</span>'
         '<span>'
         f'<span class="history-title">{html.escape(label)}</span>'
         f'<span class="history-time">{html.escape(_format_history_time(case.get("updated_at")))}</span>'

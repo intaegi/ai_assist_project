@@ -92,20 +92,40 @@ def _form_copy_text(form: dict) -> str:
     )
 
 
+def _current_form_from_state(case_id: str, form: dict) -> dict:
+    prefix = f"form_{case_id}_"
+    return {
+        "title": st.session_state.get(prefix + "title", form.get("title", "")),
+        "vendor": st.session_state.get(prefix + "vendor", form.get("vendor", "")),
+        "service_name": st.session_state.get(prefix + "service_name", form.get("service_name", "")),
+        "service_start_date": st.session_state.get(
+            prefix + "service_start_date",
+            form.get("service_start_date"),
+        ),
+        "service_end_date": st.session_state.get(prefix + "service_end_date", form.get("service_end_date")),
+        "amount": st.session_state.get(prefix + "amount", form.get("amount")),
+        "approval_category_no": st.session_state.get(
+            prefix + "approval_category_no",
+            form.get("approval_category_no", ""),
+        ),
+        "body": st.session_state.get(prefix + "body", form.get("body", "")),
+        "required_documents": form.get("required_documents", []),
+    }
+
+
 def _render_copy_button(form: dict) -> None:
     text = json.dumps(_form_copy_text(form), ensure_ascii=False).replace("</", "<\\/")
     components.html(
         f"""
-        <button id="copy-form" type="button" title="フォーム内容をコピー" aria-label="フォーム内容をコピー">
+        <button id="copy-form" type="button" aria-label="フォーム内容をコピー">
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/>
             <rect x="4" y="7" width="12" height="14" rx="2"/>
           </svg>
+          <span>フォームコピー</span>
         </button>
-        <span id="copy-result" role="tooltip" aria-live="polite">コピーしました</span>
         <script>
           const button = document.getElementById("copy-form");
-          const result = document.getElementById("copy-result");
           button.addEventListener("click", async () => {{
             const text = {text};
             try {{
@@ -118,15 +138,15 @@ def _render_copy_button(form: dict) -> None:
               document.execCommand("copy");
               area.remove();
             }}
-            result.classList.add("visible");
+            button.classList.add("copied");
             window.clearTimeout(window.copyTimer);
-            window.copyTimer = window.setTimeout(() => result.classList.remove("visible"), 1200);
+            window.copyTimer = window.setTimeout(() => button.classList.remove("copied"), 700);
           }});
         </script>
         <style>
           body {{
             margin: 0;
-            height: 44px;
+            height: 40px;
             display: flex;
             justify-content: flex-end;
             align-items: center;
@@ -134,13 +154,19 @@ def _render_copy_button(form: dict) -> None:
             font-family: sans-serif;
           }}
           button {{
-            width: 38px;
+            width: 100%;
             height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
             border: 1px solid #c4b5fd;
             border-radius: 8px;
             color: #6d28d9;
             background: #fff;
             cursor: pointer;
+            font-size: 12px;
+            font-weight: 700;
           }}
           svg {{
             width: 17px;
@@ -154,25 +180,10 @@ def _render_copy_button(form: dict) -> None:
           }}
           button:hover {{ background: #f3eeff; border-color: #7c3aed; }}
           button:focus {{ outline: 2px solid #c4b5fd; outline-offset: 1px; }}
-          span {{
-            position: absolute;
-            right: 44px;
-            top: 6px;
-            padding: 5px 8px;
-            border-radius: 7px;
-            color: #fff;
-            background: #111;
-            font-size: 11px;
-            opacity: 0;
-            transform: translateY(3px);
-            transition: opacity 0.12s ease, transform 0.12s ease;
-            pointer-events: none;
-            white-space: nowrap;
-          }}
-          span.visible {{ opacity: 1; transform: translateY(0); }}
+          button.copied {{ background: #f3eeff; border-color: #7c3aed; }}
         </style>
         """,
-        height=44,
+        height=40,
     )
 
 
@@ -183,24 +194,20 @@ def _render_field_copy_button(
 ) -> None:
     text = "" if value is None else str(value)
     serialized = json.dumps(text, ensure_ascii=False).replace("</", "<\\/")
-    safe_label = html.escape(label)
     components.html(
         f"""
         <button
           id="copy-field"
           type="button"
-          title="{safe_label}をコピー"
-          aria-label="{safe_label}をコピー"
+          aria-label="{html.escape(label)}をコピー"
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/>
             <rect x="4" y="7" width="12" height="14" rx="2"/>
           </svg>
         </button>
-        <span id="copy-result" role="tooltip" aria-live="polite">コピーしました</span>
         <script>
           const button = document.getElementById("copy-field");
-          const result = document.getElementById("copy-result");
           button.addEventListener("click", async () => {{
             const text = {serialized};
             try {{
@@ -213,9 +220,9 @@ def _render_field_copy_button(
               document.execCommand("copy");
               area.remove();
             }}
-            result.classList.add("visible");
+            button.classList.add("copied");
             window.clearTimeout(window.copyTimer);
-            window.copyTimer = window.setTimeout(() => result.classList.remove("visible"), 1200);
+            window.copyTimer = window.setTimeout(() => button.classList.remove("copied"), 700);
           }});
         </script>
         <style>
@@ -249,21 +256,7 @@ def _render_field_copy_button(
           }}
           button:hover {{ background: #f3eeff; border-color: #7c3aed; }}
           button:focus {{ outline: 2px solid #c4b5fd; outline-offset: 1px; }}
-          span {{
-            position: absolute;
-            right: 0;
-            top: 0;
-            padding: 5px 8px;
-            border-radius: 7px;
-            color: #fff;
-            background: #111;
-            font-size: 11px;
-            opacity: 0;
-            transform: translateY(3px);
-            transition: opacity 0.12s ease, transform 0.12s ease;
-            pointer-events: none;
-          }}
-          span.visible {{ opacity: 1; transform: translateY(0); }}
+          button.copied {{ background: #f3eeff; border-color: #7c3aed; }}
         </style>
         """,
         height=76,
@@ -328,7 +321,7 @@ def _copyable_text_area(
     common: dict,
 ) -> None:
     input_col, copy_col = st.columns([9, 1], gap="small")
-    input_col.text_area(label, value=value, height=220, key=key, **common)
+    input_col.text_area(label, value=value, height=120, key=key, **common)
     with copy_col:
         _render_field_copy_button(label, st.session_state.get(key, value))
 
@@ -582,7 +575,6 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         st.markdown(
             (
                 '<div class="result-header">'
-                '<div class="app-page-kicker">AI DRAFT</div>'
                 f'<h1 class="result-title">{html.escape(title)}</h1>'
                 f'<div class="result-updated">最終更新: {html.escape(_format_datetime(case.get("updated_at")))}</div>'
                 "</div>"
@@ -622,9 +614,14 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
 
     form = case.get("approval_form", {})
     prefix = f"form_{case_id}_"
+    current_form = _current_form_from_state(case_id, form)
     with form_col:
         with st.container(border=True):
-            st.subheader("📝 AI生成決裁フォーム")
+            form_title_col, form_copy_col = st.columns([3.2, 1.15], gap="small")
+            with form_title_col:
+                st.subheader("📝 AI生成決裁フォーム")
+            with form_copy_col:
+                _render_copy_button(current_form)
             st.markdown(
                 '<div class="section-kicker">AIが抽出した値です。右側のアイコンで個別コピーできます。</div>',
                 unsafe_allow_html=True,
@@ -709,24 +706,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
                 common,
             )
             st.session_state[prefix + "required_documents"] = form.get("required_documents", [])
-            current_form = {
-                "title": st.session_state.get(prefix + "title", form.get("title", "")),
-                "vendor": st.session_state.get(prefix + "vendor", form.get("vendor", "")),
-                "service_name": st.session_state.get(prefix + "service_name", form.get("service_name", "")),
-                "service_start_date": st.session_state.get(
-                    prefix + "service_start_date",
-                    form.get("service_start_date"),
-                ),
-                "service_end_date": st.session_state.get(prefix + "service_end_date", form.get("service_end_date")),
-                "amount": st.session_state.get(prefix + "amount", form.get("amount")),
-                "approval_category_no": st.session_state.get(
-                    prefix + "approval_category_no",
-                    form.get("approval_category_no", ""),
-                ),
-                "body": st.session_state.get(prefix + "body", form.get("body", "")),
-                "required_documents": form.get("required_documents", []),
-            }
-            _render_copy_button(current_form)
+            current_form = _current_form_from_state(case_id, form)
             if message := st.session_state.pop("autosave_message", None):
                 st.caption(message)
 

@@ -128,7 +128,7 @@ st.markdown(
       }
       .history-item {
         display: grid;
-        grid-template-columns: 1.25rem 1fr;
+        grid-template-columns: 1fr;
         gap: 0.5rem;
         color: inherit !important;
         text-decoration: none !important;
@@ -143,19 +143,6 @@ st.markdown(
         background: var(--app-accent-soft);
         border-color: #DDD6FE;
         color: #4C1D95 !important;
-      }
-      .history-icon {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 1.25rem;
-        height: 1.25rem;
-        margin-top: 0.08rem;
-        border-radius: 0.38rem;
-        color: #4C1D95;
-        background: var(--app-accent-soft);
-        font-size: 0.72rem;
-        font-weight: 800;
       }
       .history-title {
         display: block;
@@ -185,6 +172,9 @@ st.markdown(
       .history-more summary:hover {
         background: #F8FAFC;
       }
+      .history-more[open] summary {
+        display: none;
+      }
       .history-more summary::-webkit-details-marker {
         display: none;
       }
@@ -204,6 +194,9 @@ st.markdown(
       div[data-testid="stForm"] { border: 0; padding: 0; }
       div[data-testid="stStatusWidget"] { margin-top: 0.75rem; }
       div[data-testid="stChatMessage"] { padding: 0.75rem 1rem; }
+      div[data-testid="stWidgetLabel"] p {
+        font-weight: 700;
+      }
       div[data-testid="stVerticalBlockBorderWrapper"] {
         border-radius: 12px;
         border-color: var(--app-border);
@@ -301,7 +294,7 @@ st.markdown(
         margin-top: 0.25rem;
         color: var(--app-text);
         font-size: 1.05rem;
-        font-weight: 800;
+        font-weight: 500;
       }
       @media (max-width: 900px) {
         .result-summary-grid {

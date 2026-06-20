@@ -86,7 +86,7 @@ def render_new_case_page(client) -> str | None:
         accept_multiple_files=True,
     )
     disabled = not description.strip() or (category == "other" and not category_other.strip())
-    if st.button("AI決裁案を作成", type="primary", use_container_width=True, disabled=disabled):
+    if st.button("✨ AI決裁案を作成", type="primary", use_container_width=True, disabled=disabled):
         data = {
             "business_category": category,
             "business_category_other": category_other,

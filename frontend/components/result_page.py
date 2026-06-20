@@ -96,8 +96,13 @@ def _render_copy_button(form: dict) -> None:
     text = json.dumps(_form_copy_text(form), ensure_ascii=False).replace("</", "<\\/")
     components.html(
         f"""
-        <button id="copy-form" type="button">フォーム内容をコピー</button>
-        <span id="copy-result" aria-live="polite"></span>
+        <button id="copy-form" type="button" title="フォーム内容をコピー" aria-label="フォーム内容をコピー">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/>
+            <rect x="4" y="7" width="12" height="14" rx="2"/>
+          </svg>
+        </button>
+        <span id="copy-result" role="tooltip" aria-live="polite">コピーしました</span>
         <script>
           const button = document.getElementById("copy-form");
           const result = document.getElementById("copy-result");
@@ -113,25 +118,61 @@ def _render_copy_button(form: dict) -> None:
               document.execCommand("copy");
               area.remove();
             }}
-            result.textContent = "コピーしました";
+            result.classList.add("visible");
+            window.clearTimeout(window.copyTimer);
+            window.copyTimer = window.setTimeout(() => result.classList.remove("visible"), 1200);
           }});
         </script>
         <style>
-          body {{ margin: 0; font-family: sans-serif; }}
+          body {{
+            margin: 0;
+            height: 44px;
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            overflow: hidden;
+            font-family: sans-serif;
+          }}
           button {{
-            min-height: 38px;
-            padding: 0 14px;
-            border: 1px solid #1769aa;
-            border-radius: 6px;
-            color: #1769aa;
+            width: 38px;
+            height: 38px;
+            border: 1px solid #c4b5fd;
+            border-radius: 8px;
+            color: #6d28d9;
             background: #fff;
             cursor: pointer;
           }}
-          button:hover {{ background: #eef6fb; }}
-          span {{ margin-left: 10px; color: #17603a; font-size: 13px; }}
+          svg {{
+            width: 17px;
+            height: 17px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            vertical-align: middle;
+          }}
+          button:hover {{ background: #f3eeff; border-color: #7c3aed; }}
+          button:focus {{ outline: 2px solid #c4b5fd; outline-offset: 1px; }}
+          span {{
+            position: absolute;
+            right: 44px;
+            top: 6px;
+            padding: 5px 8px;
+            border-radius: 7px;
+            color: #fff;
+            background: #111;
+            font-size: 11px;
+            opacity: 0;
+            transform: translateY(3px);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+            pointer-events: none;
+            white-space: nowrap;
+          }}
+          span.visible {{ opacity: 1; transform: translateY(0); }}
         </style>
         """,
-        height=48,
+        height=44,
     )
 
 
@@ -143,16 +184,6 @@ def _render_field_copy_button(
     text = "" if value is None else str(value)
     serialized = json.dumps(text, ensure_ascii=False).replace("</", "<\\/")
     safe_label = html.escape(label)
-    button_content = (
-        """
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/>
-          <rect x="4" y="7" width="12" height="14" rx="2"/>
-        </svg>
-        """
-        if compact
-        else "コピー"
-    )
     components.html(
         f"""
         <button
@@ -160,8 +191,13 @@ def _render_field_copy_button(
           type="button"
           title="{safe_label}をコピー"
           aria-label="{safe_label}をコピー"
-        >{button_content}</button>
-        <span id="copy-result" aria-live="polite"></span>
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M8 7V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/>
+            <rect x="4" y="7" width="12" height="14" rx="2"/>
+          </svg>
+        </button>
+        <span id="copy-result" role="tooltip" aria-live="polite">コピーしました</span>
         <script>
           const button = document.getElementById("copy-field");
           const result = document.getElementById("copy-result");
@@ -177,13 +213,16 @@ def _render_field_copy_button(
               document.execCommand("copy");
               area.remove();
             }}
-            result.textContent = "完了";
+            result.classList.add("visible");
+            window.clearTimeout(window.copyTimer);
+            window.copyTimer = window.setTimeout(() => result.classList.remove("visible"), 1200);
           }});
         </script>
         <style>
           body {{
             margin: 0;
             padding-top: 29px;
+            overflow: hidden;
             font-family: sans-serif;
             white-space: nowrap;
           }}
@@ -191,9 +230,9 @@ def _render_field_copy_button(
             width: 100%;
             min-height: 38px;
             padding: 0 2px;
-            border: 1px solid #b9c2cf;
-            border-radius: 6px;
-            color: #1769aa;
+            border: 1px solid #c4b5fd;
+            border-radius: 8px;
+            color: #6d28d9;
             background: #fff;
             cursor: pointer;
             font-size: 11px;
@@ -208,15 +247,23 @@ def _render_field_copy_button(
             stroke-linejoin: round;
             vertical-align: middle;
           }}
-          button:hover {{ background: #eef6fb; border-color: #1769aa; }}
-          button:focus {{ outline: 2px solid #80b7df; outline-offset: 1px; }}
+          button:hover {{ background: #f3eeff; border-color: #7c3aed; }}
+          button:focus {{ outline: 2px solid #c4b5fd; outline-offset: 1px; }}
           span {{
-            display: block;
-            margin-top: 2px;
-            color: #17603a;
+            position: absolute;
+            right: 0;
+            top: 0;
+            padding: 5px 8px;
+            border-radius: 7px;
+            color: #fff;
+            background: #111;
             font-size: 11px;
-            text-align: center;
+            opacity: 0;
+            transform: translateY(3px);
+            transition: opacity 0.12s ease, transform 0.12s ease;
+            pointer-events: none;
           }}
+          span.visible {{ opacity: 1; transform: translateY(0); }}
         </style>
         """,
         height=76,
@@ -383,7 +430,7 @@ def _render_document_recovery(client, case: dict) -> None:
                 key=f"recovery_regenerate_{case['case_id']}_{input_version}",
             )
             submitted = st.form_submit_button(
-                "書類を追加して再確認",
+                "📎 書類を追加して再確認",
                 type="primary",
                 use_container_width=True,
             )
@@ -440,7 +487,8 @@ def _render_checklist(client, case: dict) -> None:
         return
 
     if st.button(
-        "チェックリストをAIで確認",
+        "✅ チェックリストをAIで確認",
+        type="primary",
         use_container_width=True,
         key=f"verify_checklist_{case['case_id']}",
     ):
@@ -483,6 +531,45 @@ def _render_checklist(client, case: dict) -> None:
         renderer(message)
 
 
+def _render_confirmation_summary(case: dict, current_form: dict) -> None:
+    validation_results = case.get("validation_results", [])
+    blocking_count = sum(
+        1
+        for item in validation_results
+        if item.get("severity") in {"error", "warning"}
+    )
+    checklist = case.get("checklist", [])
+    verification = case.get("checklist_verification", [])
+    verified_count = sum(1 for item in verification if item.get("status") == "verified")
+    documents = current_form.get("required_documents", [])
+    required_documents_text = "、".join(documents) if documents else "-"
+    checklist_text = (
+        f"{verified_count}/{len(checklist)} 確認済み"
+        if verification
+        else f"{len(checklist)}件 / AI確認前"
+    )
+    issue_text = "注意なし" if blocking_count == 0 else f"{blocking_count}件の確認事項"
+    st.markdown(
+        f"""
+        <div class="result-summary-grid">
+          <div class="result-summary-card">
+            <div class="result-summary-label">不足・注意</div>
+            <div class="result-summary-value">{html.escape(issue_text)}</div>
+          </div>
+          <div class="result-summary-card">
+            <div class="result-summary-label">チェックリスト</div>
+            <div class="result-summary-value">{html.escape(checklist_text)}</div>
+          </div>
+          <div class="result-summary-card">
+            <div class="result-summary-label">必要書類</div>
+            <div class="result-summary-value">{html.escape(required_documents_text)}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def render_result_page(client, case_id: str, history_mode: bool = False) -> None:
     try:
         case = client.get_case(case_id)
@@ -499,7 +586,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
     copy_clicked = False
     if history_mode:
         _, copy_col = st.columns([4, 1.5])
-        copy_clicked = copy_col.button("新規作成へコピー", use_container_width=True)
+        copy_clicked = copy_col.button("＋ 新規作成へコピー", use_container_width=True)
     if copy_clicked:
         try:
             clone = client.clone(case_id)
@@ -511,17 +598,22 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         except ApiError as exc:
             st.error(str(exc))
 
+    st.markdown(
+        '<div class="app-section-heading"><span class="app-section-number">1</span>生成結果表示</div>',
+        unsafe_allow_html=True,
+    )
     preview_col, form_col = st.columns([0.92, 1.08], gap="large")
     with preview_col:
-        st.subheader("原本書類")
-        st.caption("AIが参照した原本を確認できます。")
-        _render_preview(client, case)
+        with st.container(border=True):
+            st.subheader("📄 原本書類")
+            st.caption("AIが参照した原本を確認できます。")
+            _render_preview(client, case)
 
     form = case.get("approval_form", {})
     prefix = f"form_{case_id}_"
     with form_col:
         with st.container(border=True):
-            st.subheader("AI生成決裁フォーム")
+            st.subheader("📝 AI生成決裁フォーム")
             st.markdown(
                 '<div class="section-kicker">AIが抽出した値です。右側のアイコンで個別コピーできます。</div>',
                 unsafe_allow_html=True,
@@ -627,8 +719,14 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             if message := st.session_state.pop("autosave_message", None):
                 st.caption(message)
 
+    st.markdown(
+        '<div class="app-section-heading"><span class="app-section-number">2</span>結果確認</div>',
+        unsafe_allow_html=True,
+    )
+    _render_confirmation_summary(case, current_form)
+
     with st.container(border=True):
-        st.subheader("要約")
+        st.subheader("🧾 要約")
         st.markdown("#### 生成内容")
         st.write(case.get("summary") or "要約はありません。")
 
@@ -651,7 +749,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             st.info("比較できる添付書類がありません。")
 
     with st.container(border=True):
-        st.markdown("#### 不足・注意")
+        st.markdown("#### ⚠ 不足・注意")
         if message := st.session_state.pop("document_recovery_message", None):
             st.success(message)
         for item in case.get("resolution_notices", []):
@@ -667,12 +765,12 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         _render_document_recovery(client, case)
 
     with st.container(border=True):
-        st.markdown("#### チェックリスト")
+        st.markdown("#### ✅ チェックリスト")
         st.caption("フォームと添付書類を照合し、確認済みにできる項目をAIで判定します。")
         _render_checklist(client, case)
 
     with st.container(border=True):
-        st.markdown("#### 必要書類")
+        st.markdown("#### 📚 必要書類")
         documents = current_form.get("required_documents", [])
         st.write("、".join(documents) if documents else "AIが必要書類を特定できませんでした。")
 
@@ -701,9 +799,12 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             st.caption("AI決裁案を初回作成" if instruction == "initial_generation" else instruction)
             st.divider()
 
-    st.markdown("---")
-    st.subheader("AIへの修正依頼")
-    st.caption("修正対象を選んで依頼すると、AI生成フォームと修正チャット履歴へ反映されます。")
+    st.markdown(
+        '<div class="app-section-heading"><span class="app-section-number">3</span>AIチャット</div>',
+        unsafe_allow_html=True,
+    )
+    st.subheader("💬 AIへの相談・修正")
+    st.caption("修正対象の選択は不要です。自然文で依頼すると、AIが決裁案全体を確認して必要な箇所へ反映します。")
     input_version_key = f"revision_input_version_{case_id}"
     input_version = st.session_state.get(input_version_key, 0)
     instruction_key = f"revision_instruction_{case_id}_{input_version}"
@@ -724,18 +825,13 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
 
     with st.container(border=True):
         with st.form(f"revision_form_{case_id}", clear_on_submit=False):
-            target_label = st.selectbox(
-                "修正対象",
-                list(REVISION_TARGETS),
-                key=f"revision_target_{case_id}",
-            )
             instruction = st.text_area(
-                "修正内容",
-                placeholder="例: 決裁本文を承認者向けに1文へまとめてください。",
+                "AIへの依頼内容",
+                placeholder="例: 決裁本文を承認者向けに1文へまとめてください。金額と期間も添付書類と再確認してください。",
                 key=instruction_key,
             )
             submitted = st.form_submit_button(
-                "AIに修正を依頼",
+                "💬 AIに相談・修正",
                 type="primary",
                 use_container_width=True,
             )
@@ -749,12 +845,12 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
                 client.chat(
                     case_id,
                     instruction.strip(),
-                    REVISION_TARGETS[target_label],
+                    "all",
                 )
             _clear_form_state(case_id)
             st.session_state[input_version_key] = input_version + 1
             st.session_state[success_message_key] = (
-                f"{target_label}を更新し、フォームと修正履歴に反映しました。"
+                "AIが決裁案全体を確認し、生成結果と修正履歴に反映しました。"
             )
             st.rerun()
         except ApiError as exc:

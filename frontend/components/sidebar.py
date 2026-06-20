@@ -66,7 +66,10 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
         generated = [case for case in cases if case.get("current_version", 0) > 0]
         if not generated:
             st.caption("作成履歴はまだありません")
-        for case in generated[:20]:
+        visible_count_key = "sidebar_history_visible_count"
+        visible_count = st.session_state.get(visible_count_key, 4)
+        visible_cases = generated[:visible_count]
+        for case in visible_cases:
             label = case.get("title") or case.get("description", "名称未設定")[:24]
             is_active_history = page == "history" and selected == case["case_id"]
             active_class = " active" if is_active_history else ""
@@ -83,6 +86,10 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
                 ),
                 unsafe_allow_html=True,
             )
+        if len(generated) > visible_count:
+            if st.button("＋ もっと見る", use_container_width=True, key="show_more_history"):
+                st.session_state[visible_count_key] = visible_count + 4
+                st.rerun()
         if active_case_id:
             st.markdown(
                 f'<div class="sidebar-current-case">現在の案件<br>{html.escape(active_case_id)}</div>',

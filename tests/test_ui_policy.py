@@ -3,7 +3,7 @@ from pathlib import Path
 
 def test_new_case_has_single_primary_action():
     source = Path("frontend/components/new_case_page.py").read_text(encoding="utf-8")
-    assert source.count('st.button("AI決裁案を作成"') == 1
+    assert source.count('st.button("✨ AI決裁案を作成"') == 1
     assert "一時保存" not in source
     assert "作成完了" not in source
 
@@ -21,22 +21,26 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "disabled=not files" not in source
     assert "revision_success_message" in source
     assert "過去の修正履歴を表示" in source
-    assert 'st.subheader("要約")' in source
+    assert 'st.subheader("🧾 要約")' in source
     assert 'st.tabs(["要約"' not in source
     assert 'st.expander("詳細情報"' in source
     assert "フォーム内容をコピー" in source
     assert "_render_field_copy_button" in source
     assert "タイトルをコピー" not in source
     assert '<svg viewBox="0 0 24 24"' in source
-    assert 'if compact' in source
+    assert 'role="tooltip"' in source
     assert "build_comparison_rows" in source
+    assert "生成結果表示" in source
+    assert "結果確認" in source
+    assert "AIチャット" in source
     assert "不足書類を追加して再確認" in source
     assert "書類を追加して再確認" in source
     assert "チェックリストをAIで確認" in source
     assert "resolution_notices" in source
     assert "_clear_form_state" in source
-    assert "決裁フォーム全体" in source
-    assert "決裁案全体（フォーム・要約・チェックリスト）" in source
+    assert 'key=f"revision_target_{case_id}"' not in source
+    assert '"all"' in source
+    assert "AIへの依頼内容" in source
     assert "変更内容を保存" not in source
     assert "作成完了" not in source
 
@@ -49,7 +53,7 @@ def test_streamlit_entrypoint_adds_project_root_to_python_path():
 
 def test_streamlit_theme_uses_accent_primary_color():
     source = Path(".streamlit/config.toml").read_text(encoding="utf-8")
-    assert 'primaryColor = "#0AB4F7"' in source
+    assert 'primaryColor = "#7C3AED"' in source
     assert 'toolbarMode = "minimal"' in source
 
 

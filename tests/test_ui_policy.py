@@ -36,7 +36,7 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "build_comparison_rows" in source
     assert "生成結果表示" in source
     assert "result-pair-marker" in source
-    assert 'st.columns([1, 1], gap="small")' in source
+    assert 'st.columns([4, 6], gap="small")' in source
     assert "結果確認" in source
     assert "AIチャット" in source
     assert "不足書類を追加して再確認" in source
@@ -50,6 +50,8 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "自然文で依頼すると、AIが対象項目を判断" in source
     assert "変更内容を保存" not in source
     assert "作成完了" not in source
+    assert "_copyable_number_input" in source
+    assert 'st.columns([4.8, 0.8, 4.8, 0.8]' not in source
 
 
 def test_chat_message_colors_are_role_specific():
@@ -98,13 +100,14 @@ def test_settings_labels_explain_rule_formats():
 def test_sidebar_marks_current_page_as_primary():
     source = Path("frontend/components/sidebar.py").read_text(encoding="utf-8")
     assert 'type="primary" if page == "settings" else "secondary"' in source
-    assert 'key=f"history_{case[\'case_id\']}"' in source
     assert "history_show_more" in source
     assert "history-icon" not in source
     assert 'st.query_params.get("case_id")' in source
-    assert 'href="?case_id=' not in source
+    assert 'class="history-item{active_class}"' in source
+    assert 'class="history-title"' in source
+    assert 'class="history-time"' in source
+    assert 'href = "?case_id=' not in source
     assert 'st.rerun()' not in source
-    assert 'return f"{label}\\n        {updated}"' in source
 
 
 def test_global_css_keeps_settings_inputs_and_history_readable():

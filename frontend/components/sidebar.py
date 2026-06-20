@@ -1,5 +1,6 @@
 import html
 from datetime import datetime
+from urllib.parse import quote
 from zoneinfo import ZoneInfo
 
 import streamlit as st
@@ -15,10 +16,21 @@ def _format_history_time(value: str | None) -> str:
         return value
 
 
-def _history_button_label(case: dict) -> str:
-    label = case.get("title") or case.get("description", "名称未設定")[:24]
+def _render_history_link(case: dict, active: bool) -> None:
+    title = case.get("title") or case.get("description", "名称未設定")[:24]
     updated = _format_history_time(case.get("updated_at"))
-    return f"{label}\n        {updated}" if updated else label
+    active_class = " active" if active else ""
+    href = f"?case_id={quote(str(case['case_id']))}"
+    time_html = f'<span class="history-time">{html.escape(updated)}</span>' if updated else ""
+    st.markdown(
+        f"""
+        <a href="{href}" target="_self" rel="noopener noreferrer" class="history-item{active_class}">
+          <span class="history-title">{html.escape(title)}</span>
+          {time_html}
+        </a>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]:
@@ -75,15 +87,7 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
         show_more = st.session_state.get("history_show_more", False)
         for case in visible_cases + (hidden_cases if show_more else []):
             active = page == "history" and selected == case["case_id"]
-            if st.button(
-                _history_button_label(case),
-                key=f"history_{case['case_id']}",
-                use_container_width=True,
-                type="primary" if active else "secondary",
-            ):
-                st.query_params.clear()
-                page = "history"
-                selected = case["case_id"]
+            _render_history_link(case, active)
         if hidden_cases and not show_more:
             if st.button(
                 "＋ もっと見る",

@@ -287,6 +287,16 @@ def _copyable_text_input(
     _text_input_with_copy(input_col, copy_col, label, value, key, common)
 
 
+def _copyable_number_input(
+    label: str,
+    value: float,
+    key: str,
+    common: dict,
+) -> None:
+    input_col, copy_col = st.columns([9, 1], gap="small")
+    _number_input_with_copy(input_col, copy_col, label, value, key, common)
+
+
 def _copyable_text_area(
     label: str,
     value: str,
@@ -579,7 +589,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         unsafe_allow_html=True,
     )
     st.markdown('<div class="result-pair-marker"></div>', unsafe_allow_html=True)
-    preview_col, form_col = st.columns([1, 1], gap="small")
+    preview_col, form_col = st.columns([4, 6], gap="small")
     with preview_col:
         with st.container(border=True):
             st.subheader("📄 原本書類")
@@ -607,71 +617,41 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
                 prefix + "title",
                 common,
             )
-            vendor_input, vendor_copy, service_input, service_copy = st.columns(
-                [4.8, 0.8, 4.8, 0.8],
-                gap="small",
-            )
-            _text_input_with_copy(
-                vendor_input,
-                vendor_copy,
+            _copyable_text_input(
                 "取引先",
                 form.get("vendor", ""),
                 prefix + "vendor",
                 common,
-                compact=True,
             )
-            _text_input_with_copy(
-                service_input,
-                service_copy,
+            _copyable_text_input(
                 "製品・サービス名",
                 form.get("service_name", ""),
                 prefix + "service_name",
                 common,
-                compact=True,
             )
-            start_input, start_copy, end_input, end_copy = st.columns(
-                [4.8, 0.8, 4.8, 0.8],
-                gap="small",
-            )
-            _text_input_with_copy(
-                start_input,
-                start_copy,
+            _copyable_text_input(
                 "利用開始日",
                 form.get("service_start_date") or "",
                 prefix + "service_start_date",
                 common,
-                compact=True,
             )
-            _text_input_with_copy(
-                end_input,
-                end_copy,
+            _copyable_text_input(
                 "利用終了日",
                 form.get("service_end_date") or "",
                 prefix + "service_end_date",
                 common,
-                compact=True,
             )
-            amount_input, amount_copy, category_input, category_copy = st.columns(
-                [4.8, 0.8, 4.8, 0.8],
-                gap="small",
-            )
-            _number_input_with_copy(
-                amount_input,
-                amount_copy,
+            _copyable_number_input(
                 "金額",
                 float(form.get("amount") or 0),
                 prefix + "amount",
                 common,
-                compact=True,
             )
-            _text_input_with_copy(
-                category_input,
-                category_copy,
+            _copyable_text_input(
                 "決裁科目番号",
                 form.get("approval_category_no", ""),
                 prefix + "approval_category_no",
                 common,
-                compact=True,
             )
             _copyable_text_area(
                 "決裁本文",

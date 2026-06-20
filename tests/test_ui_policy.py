@@ -86,6 +86,15 @@ def test_material_registration_is_single_item_and_clears_form():
     assert "Azure AI Searchへは送信されていません" in source
 
 
+def test_settings_labels_explain_rule_formats():
+    source = Path("frontend/components/settings_page.py").read_text(encoding="utf-8")
+    assert "必須入力項目（1行につき キー|表示名|入力型）" in source
+    assert "条件付き書類（1行につき 書類名|条件）" in source
+    assert "キーは内部ID、表示名はAI生成フォームの項目名" in source
+    assert "保存後、この設定はAI生成フォームの抽出項目" in source
+    assert "条件に該当すると、該当書類が不足していないか" in source
+
+
 def test_sidebar_marks_current_page_as_primary():
     source = Path("frontend/components/sidebar.py").read_text(encoding="utf-8")
     assert 'type="primary" if page == "settings" else "secondary"' in source
@@ -95,6 +104,16 @@ def test_sidebar_marks_current_page_as_primary():
     assert 'st.query_params.get("case_id")' in source
     assert 'href="?case_id=' not in source
     assert 'st.rerun()' not in source
+    assert 'return f"{label}\\n        {updated}"' in source
+
+
+def test_global_css_keeps_settings_inputs_and_history_readable():
+    source = Path("frontend/app.py").read_text(encoding="utf-8")
+    assert '[data-testid="stSidebar"] div[data-testid="stButton"] button p' in source
+    assert "white-space: pre-line;" in source
+    assert 'button[data-baseweb="tab"] p' in source
+    assert 'div[data-testid="stTextArea"] textarea' in source
+    assert 'div[data-testid="stFileUploader"] section' in source
 
 
 def test_frontend_health_check_uses_short_timeout():

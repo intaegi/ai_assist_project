@@ -113,6 +113,13 @@ st.markdown(
         box-shadow: none;
         font-weight: 600;
       }
+      [data-testid="stSidebar"] div[data-testid="stButton"] button p {
+        width: 100%;
+        margin: 0;
+        text-align: left;
+        white-space: pre-line;
+        line-height: 1.32;
+      }
       [data-testid="stSidebar"] div[data-testid="stButton"] button[kind="primary"] {
         color: #fff;
         background: var(--app-accent);
@@ -214,6 +221,10 @@ st.markdown(
       div[data-testid="stWidgetLabel"] p {
         font-weight: 700;
       }
+      button[data-baseweb="tab"] p,
+      div[data-baseweb="tab-list"] button p {
+        font-weight: 800;
+      }
       div[data-testid="stVerticalBlockBorderWrapper"] {
         border-radius: 12px;
         border-color: var(--app-border);
@@ -223,11 +234,17 @@ st.markdown(
       div[data-testid="stAlert"] { border-radius: 10px; }
       div[data-testid="stTextInput"] input,
       div[data-testid="stNumberInput"] input,
+      div[data-testid="stTextArea"] textarea,
       textarea,
       div[data-baseweb="select"] > div {
         border-radius: 8px;
         background-color: var(--app-soft);
-        border-color: var(--app-border);
+        border: 1px solid var(--app-border);
+      }
+      div[data-testid="stFileUploader"] section {
+        border: 1px solid var(--app-border);
+        border-radius: 10px;
+        background: var(--app-soft);
       }
       div[data-testid="stTextInput"] input:focus,
       div[data-testid="stNumberInput"] input:focus,

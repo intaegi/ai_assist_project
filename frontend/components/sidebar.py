@@ -18,7 +18,7 @@ def _format_history_time(value: str | None) -> str:
 def _history_button_label(case: dict) -> str:
     label = case.get("title") or case.get("description", "名称未設定")[:24]
     updated = _format_history_time(case.get("updated_at"))
-    return f"{label}\n{updated}" if updated else label
+    return f"{label}\n        {updated}" if updated else label
 
 
 def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]:

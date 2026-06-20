@@ -22,15 +22,31 @@ def render_settings_page(client) -> None:
         category_label = st.selectbox("業務カテゴリ", list(CATEGORIES))
         approval_type = st.selectbox("決裁種類", APPROVAL_TYPES)
         required_fields = st.text_area(
-            "必須入力項目（1行につき `キー|表示名|入力型`）",
+            "必須入力項目（1行につき キー|表示名|入力型）",
             "purpose|目的|textarea\nvendor|取引先|text\nservice_name|製品・サービス名|text\namount|金額|number",
             height=140,
+            help=(
+                "決裁フォームで必須確認する項目を定義します。"
+                "キーは内部ID、表示名はAI生成フォームの項目名、入力型はtext/textarea/numberです。"
+            ),
+        )
+        st.caption(
+            "例: service_name|製品・サービス名|text。"
+            "保存後、この設定はAI生成フォームの抽出項目・必須入力チェック・テンプレートに反映されます。"
         )
         required_documents = st.text_input("必要書類（カンマ区切り）", "請求書")
         conditional_documents = st.text_area(
-            "条件付き書類（1行につき `書類名|条件`）",
+            "条件付き書類（1行につき 書類名|条件）",
             "見積書|新規契約または10万円以上の場合",
             height=90,
+            help=(
+                "条件を満たす場合だけ必要になる書類を定義します。"
+                "不足・注意、必要書類チェック、再確認時の判定に使われます。"
+            ),
+        )
+        st.caption(
+            "例: 契約書|年間契約の場合。"
+            "条件に該当すると、該当書類が不足していないかAI確認の対象になります。"
         )
         if st.button("基準設定を保存", type="primary"):
             fields = []

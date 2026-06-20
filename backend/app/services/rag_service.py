@@ -104,6 +104,9 @@ class RagService:
 
     def revise(self, case: CaseRecord, instruction: str, target_field: str) -> CaseRecord:
         if target_field == "all":
+            inferred_targets = self._infer_revision_targets(instruction)
+            if inferred_targets:
+                return self._revise_targeted_fields(case, instruction, inferred_targets)
             updated = self.generate(case, instruction=instruction)
             updated.chat_logs.extend(
                 [
@@ -147,6 +150,83 @@ class RagService:
         self._save_generated_output(case)
         self.data_store.save_case(case.model_dump(mode="json"))
         return case
+
+    def _revise_targeted_fields(
+        self,
+        case: CaseRecord,
+        instruction: str,
+        target_fields: list[str],
+    ) -> CaseRecord:
+        for field in target_fields:
+            case.approval_form = self.ai_service.revise(case.approval_form, instruction, field)
+        assistant_message = self._multi_revision_message(case, target_fields)
+        self.refresh_validation(case)
+        case.checklist_verification = []
+        case.title = case.approval_form.title
+        case.amount = case.approval_form.amount
+        case.current_version += 1
+        case.updated_at = utc_now()
+        case.last_generated_at = utc_now()
+        case.chat_logs.extend(
+            [
+                {"role": "user", "message": instruction, "target_field": "all", "created_at": utc_now()},
+                {
+                    "role": "assistant",
+                    "message": assistant_message,
+                    "target_field": ",".join(target_fields),
+                    "created_at": utc_now(),
+                },
+            ]
+        )
+        case.versions.append(
+            {
+                "version": case.current_version,
+                "approval_form": case.approval_form.model_dump(mode="json"),
+                "instruction": instruction,
+                "target_fields": target_fields,
+                "created_at": utc_now(),
+            }
+        )
+        self._save_generated_output(case)
+        self.data_store.save_case(case.model_dump(mode="json"))
+        return case
+
+    @staticmethod
+    def _infer_revision_targets(instruction: str) -> list[str]:
+        text = instruction.lower()
+        targets: list[str] = []
+        patterns = (
+            ("body", ("決裁本文", "本文", "要約", "文で", "文に")),
+            ("service_name", ("製品・サービス名", "サービス名", "製品名", "サービス", "product", "service")),
+            ("title", ("タイトル", "件名")),
+            ("vendor", ("取引先", "会社名", "vendor")),
+            ("amount", ("金額", "費用", "価格", "amount")),
+            ("service_period", ("利用期間", "利用開始日", "利用終了日", "開始日", "終了日", "期間")),
+            ("approval_category_no", ("決裁科目番号", "科目番号")),
+        )
+        for field, keywords in patterns:
+            if any(keyword.lower() in text for keyword in keywords):
+                targets.append(field)
+        if not targets:
+            return []
+        full_regeneration_terms = ("全体", "再作成", "追加書類", "チェックリスト", "必要書類", "不足")
+        if any(term.lower() in text for term in full_regeneration_terms) and len(targets) == 1:
+            return []
+        return targets
+
+    @staticmethod
+    def _multi_revision_message(case: CaseRecord, target_fields: list[str]) -> str:
+        labels = {
+            "body": "決裁本文",
+            "service_name": "製品・サービス名",
+            "title": "タイトル",
+            "vendor": "取引先",
+            "amount": "金額",
+            "service_period": "利用期間",
+            "approval_category_no": "決裁科目番号",
+        }
+        updated_labels = "、".join(labels.get(field, field) for field in target_fields)
+        return f"指定された項目だけを更新しました: {updated_labels}"
 
     @staticmethod
     def _revision_message(case: CaseRecord, target_field: str) -> str:

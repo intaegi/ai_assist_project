@@ -73,7 +73,13 @@ class LocalAIService:
             else:
                 updated.body = f"{updated.body}\n\n修正指示: {instruction}".strip()
         elif target_field in {"title", "vendor", "service_name", "approval_category_no"}:
-            setattr(updated, target_field, instruction.strip())
+            if target_field == "service_name" and re.search(r"英語|English", instruction, re.IGNORECASE):
+                value = updated.service_name or instruction
+                value = re.sub(r"(年間|年額|月額|利用料|支払|申請|ライセンス|契約)", " ", value)
+                value = re.sub(r"[^\w\s.+#&/-]", " ", value)
+                updated.service_name = " ".join(value.split()) or updated.service_name
+            else:
+                setattr(updated, target_field, instruction.strip())
         elif target_field == "amount":
             match = re.search(r"[\d,]+", instruction)
             if match:

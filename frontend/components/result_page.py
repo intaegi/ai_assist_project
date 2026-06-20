@@ -24,37 +24,10 @@ FORM_STATE_FIELDS = (
     "required_documents",
 )
 
-REVISION_TARGETS = {
-    "決裁本文": "body",
-    "決裁フォーム全体": "form",
-    "決裁案全体（フォーム・要約・チェックリスト）": "all",
-    "タイトル": "title",
-    "取引先": "vendor",
-    "製品・サービス名": "service_name",
-    "利用期間": "service_period",
-    "金額": "amount",
-    "決裁科目番号": "approval_category_no",
-}
-
-
-def _revision_target_label(target_field: str) -> str:
-    return next(
-        (
-            label
-            for label, value in REVISION_TARGETS.items()
-            if value == target_field
-        ),
-        target_field,
-    )
-
-
 def _render_revision_logs(logs: list[dict]) -> None:
     for log in logs:
         role = log.get("role", "assistant")
         with st.chat_message(role if role in {"user", "assistant"} else "assistant"):
-            target = _revision_target_label(log.get("target_field", ""))
-            if target:
-                st.caption(f"修正対象: {target}")
             st.write(log.get("message", ""))
 
 
@@ -790,27 +763,21 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         '<div class="app-section-heading">AIチャット</div>',
         unsafe_allow_html=True,
     )
-    st.subheader("💬 AIへの相談・修正")
-    st.caption("修正対象の選択は不要です。自然文で依頼すると、AIが決裁案全体を確認して必要な箇所へ反映します。")
+    st.caption("自然文で依頼すると、AIが対象項目を判断して必要な箇所だけへ反映します。")
     input_version_key = f"revision_input_version_{case_id}"
     input_version = st.session_state.get(input_version_key, 0)
     instruction_key = f"revision_instruction_{case_id}_{input_version}"
-    success_message_key = f"revision_success_message_{case_id}"
-    if message := st.session_state.pop(success_message_key, None):
-        st.success(message)
 
     chat_logs = case.get("chat_logs", [])
-    if chat_logs:
-        st.markdown("#### 修正チャット履歴")
+    with st.container(border=True):
         recent_logs = chat_logs[-6:]
-        with st.container(border=True):
+        if recent_logs:
             _render_revision_logs(recent_logs)
         older_logs = chat_logs[:-len(recent_logs)]
         if older_logs:
             with st.expander(f"過去の修正履歴を表示（{len(older_logs) // 2}件）"):
                 _render_revision_logs(older_logs)
 
-    with st.container(border=True):
         with st.form(f"revision_form_{case_id}", clear_on_submit=False):
             instruction = st.text_area(
                 "AIへの依頼内容",
@@ -828,17 +795,18 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             st.warning("修正内容を入力してください。")
             return
         try:
-            with st.spinner("最新案を作成しています"):
-                client.chat(
-                    case_id,
-                    instruction.strip(),
-                    "all",
-                )
+            with st.chat_message("user"):
+                st.write(instruction.strip())
+            with st.chat_message("assistant"):
+                with st.spinner("最新案を作成しています"):
+                    st.write("最新案を作成しています。")
+                    client.chat(
+                        case_id,
+                        instruction.strip(),
+                        "all",
+                    )
             _clear_form_state(case_id)
             st.session_state[input_version_key] = input_version + 1
-            st.session_state[success_message_key] = (
-                "AIが決裁案全体を確認し、生成結果と修正履歴に反映しました。"
-            )
             st.rerun()
         except ApiError as exc:
             st.error(str(exc))

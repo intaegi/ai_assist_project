@@ -14,12 +14,12 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "st.form(" in source
     assert "st.form_submit_button(" in source
     assert "clear_on_submit=False" in source
-    assert "修正チャット履歴" in source
+    assert "修正チャット履歴" not in source
     assert "st.chat_message(" in source
     assert "登録済みのためスキップしました" in source
     assert "追加書類を1件以上選択してください。" in source
     assert "disabled=not files" not in source
-    assert "revision_success_message" in source
+    assert "revision_success_message" not in source
     assert "過去の修正履歴を表示" in source
     assert 'st.expander("🧾 要約・書類比較・不足確認を表示", expanded=False)' in source
     assert 'st.tabs(["要約"' not in source
@@ -44,6 +44,7 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert 'key=f"revision_target_{case_id}"' not in source
     assert '"all"' in source
     assert "AIへの依頼内容" in source
+    assert "自然文で依頼すると、AIが対象項目を判断" in source
     assert "変更内容を保存" not in source
     assert "作成完了" not in source
 

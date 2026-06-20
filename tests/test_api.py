@@ -288,6 +288,38 @@ def test_chat_can_regenerate_entire_case(client):
     )
 
 
+def test_chat_infers_target_fields_and_preserves_others(client):
+    case = create_case(client)
+    generated = client.post(f"/cases/{case['case_id']}/generate").json()
+    form = generated["approval_form"]
+    form.update(
+        {
+            "title": "CloudGuard Pro 年間利用料支払い申請",
+            "vendor": "株式会社ネクストクラウド",
+            "service_name": "CloudGuard Pro 年間ライセンス",
+            "body": "第一文です。第二文です。第三文です。",
+        }
+    )
+    patched = client.patch(f"/cases/{case['case_id']}", json={"approval_form": form}).json()
+
+    response = client.post(
+        f"/cases/{case['case_id']}/chat",
+        json={
+            "instruction": "決裁本文を2文でまとめてください\n製品・サービス名は英語で記載してください",
+            "target_field": "all",
+        },
+    )
+
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    revised = payload["approval_form"]
+    assert revised["body"] == "第一文です。第二文です。"
+    assert revised["service_name"] == "CloudGuard Pro"
+    assert revised["title"] == patched["approval_form"]["title"]
+    assert revised["vendor"] == patched["approval_form"]["vendor"]
+    assert payload["chat_logs"][-1]["target_field"] == "body,service_name"
+
+
 def test_requirement_setting_can_be_updated(client):
     payload = {
         "business_category": "other",

@@ -194,6 +194,10 @@ st.markdown(
       div[data-testid="stForm"] { border: 0; padding: 0; }
       div[data-testid="stStatusWidget"] { margin-top: 0.75rem; }
       div[data-testid="stChatMessage"] { padding: 0.75rem 1rem; }
+      div[data-testid="stChatMessage"] {
+        border-radius: 0.9rem;
+        background: var(--app-soft);
+      }
       div[data-testid="stWidgetLabel"] p {
         font-weight: 700;
       }

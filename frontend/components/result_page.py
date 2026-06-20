@@ -577,16 +577,27 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         st.error(str(exc))
         return
     title = case.get("title") or "決裁案"
-    st.markdown(
-        '<div class="app-page-kicker"><span class="app-page-icon">□</span>AI DRAFT</div>',
-        unsafe_allow_html=True,
-    )
-    st.title(title)
-    st.caption(f"最終更新: {_format_datetime(case.get('updated_at'))}")
+    header_col, action_col = st.columns([3.2, 1], gap="large")
+    with header_col:
+        st.markdown(
+            (
+                '<div class="result-header">'
+                '<div class="app-page-kicker">AI DRAFT</div>'
+                f'<h1 class="result-title">{html.escape(title)}</h1>'
+                f'<div class="result-updated">最終更新: {html.escape(_format_datetime(case.get("updated_at")))}</div>'
+                "</div>"
+            ),
+            unsafe_allow_html=True,
+        )
     copy_clicked = False
     if history_mode:
-        _, copy_col = st.columns([4, 1.5])
-        copy_clicked = copy_col.button("＋ 新規作成へコピー", use_container_width=True)
+        with action_col:
+            st.write("")
+            copy_clicked = st.button(
+                "＋ 新規作成へコピー",
+                type="primary",
+                use_container_width=True,
+            )
     if copy_clicked:
         try:
             clone = client.clone(case_id)
@@ -599,7 +610,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             st.error(str(exc))
 
     st.markdown(
-        '<div class="app-section-heading"><span class="app-section-number">1</span>生成結果表示</div>',
+        '<div class="app-section-heading"><span class="app-section-number">01</span>生成結果表示</div>',
         unsafe_allow_html=True,
     )
     preview_col, form_col = st.columns([0.92, 1.08], gap="large")
@@ -720,13 +731,12 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
                 st.caption(message)
 
     st.markdown(
-        '<div class="app-section-heading"><span class="app-section-number">2</span>結果確認</div>',
+        '<div class="app-section-heading"><span class="app-section-number">02</span>結果確認</div>',
         unsafe_allow_html=True,
     )
     _render_confirmation_summary(case, current_form)
 
-    with st.container(border=True):
-        st.subheader("🧾 要約")
+    with st.expander("🧾 要約・書類比較・不足確認を表示", expanded=False):
         st.markdown("#### 生成内容")
         st.write(case.get("summary") or "要約はありません。")
 
@@ -748,7 +758,6 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         else:
             st.info("比較できる添付書類がありません。")
 
-    with st.container(border=True):
         st.markdown("#### ⚠ 不足・注意")
         if message := st.session_state.pop("document_recovery_message", None):
             st.success(message)
@@ -764,12 +773,10 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             renderer(item["message"])
         _render_document_recovery(client, case)
 
-    with st.container(border=True):
         st.markdown("#### ✅ チェックリスト")
         st.caption("フォームと添付書類を照合し、確認済みにできる項目をAIで判定します。")
         _render_checklist(client, case)
 
-    with st.container(border=True):
         st.markdown("#### 📚 必要書類")
         documents = current_form.get("required_documents", [])
         st.write("、".join(documents) if documents else "AIが必要書類を特定できませんでした。")
@@ -800,7 +807,7 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
             st.divider()
 
     st.markdown(
-        '<div class="app-section-heading"><span class="app-section-number">3</span>AIチャット</div>',
+        '<div class="app-section-heading"><span class="app-section-number">03</span>AIチャット</div>',
         unsafe_allow_html=True,
     )
     st.subheader("💬 AIへの相談・修正")

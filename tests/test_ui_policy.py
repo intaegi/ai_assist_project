@@ -21,7 +21,7 @@ def test_result_uses_revision_form_and_chat_history_without_save_button():
     assert "disabled=not files" not in source
     assert "revision_success_message" in source
     assert "過去の修正履歴を表示" in source
-    assert 'st.subheader("🧾 要約")' in source
+    assert 'st.expander("🧾 要約・書類比較・不足確認を表示", expanded=False)' in source
     assert 'st.tabs(["要約"' not in source
     assert 'st.expander("詳細情報"' in source
     assert "フォーム内容をコピー" in source
@@ -54,6 +54,7 @@ def test_streamlit_entrypoint_adds_project_root_to_python_path():
 def test_streamlit_theme_uses_accent_primary_color():
     source = Path(".streamlit/config.toml").read_text(encoding="utf-8")
     assert 'primaryColor = "#7C3AED"' in source
+    assert 'backgroundColor = "#FFFFFF"' in source
     assert 'toolbarMode = "minimal"' in source
 
 
@@ -74,6 +75,8 @@ def test_sidebar_marks_current_page_as_primary():
     assert 'class="history-item{active_class}"' in source
     assert 'class="history-time"' in source
     assert 'st.query_params.get("case_id")' in source
+    assert '<details class="history-more">' in source
+    assert 'st.rerun()' not in source
 
 
 def test_frontend_health_check_uses_short_timeout():

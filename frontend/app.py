@@ -29,7 +29,7 @@ st.markdown(
         --app-accent: #7C3AED;
         --app-accent-dark: #6D28D9;
         --app-accent-soft: #F3EEFF;
-        --app-bg: #FAFAFA;
+        --app-bg: #FFFFFF;
         --app-sidebar: #FFFFFF;
         --app-border: #E6E6E6;
         --app-soft: #F7F7F8;
@@ -38,7 +38,7 @@ st.markdown(
       }
       .stApp { background: var(--app-bg); }
       .block-container {
-        padding-top: 3.25rem;
+        padding-top: 2.25rem;
         padding-bottom: 3.5rem;
         max-width: 1440px;
       }
@@ -58,8 +58,9 @@ st.markdown(
       .sidebar-brand {
         display: flex;
         align-items: center;
-        gap: 0.55rem;
-        margin: 0.2rem 0 1.25rem;
+        margin: 0.2rem 0 1.15rem;
+        padding-left: 0.65rem;
+        border-left: 4px solid var(--app-accent);
         color: var(--app-text);
         font-size: 1.1rem;
         font-weight: 700;
@@ -169,6 +170,24 @@ st.markdown(
         font-size: 0.68rem;
         text-align: right;
       }
+      .history-more {
+        margin-top: 0.2rem;
+      }
+      .history-more summary {
+        display: block;
+        padding: 0.52rem 0.65rem;
+        color: var(--app-text);
+        border-radius: 0.75rem;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+      .history-more summary:hover {
+        background: #F8FAFC;
+      }
+      .history-more summary::-webkit-details-marker {
+        display: none;
+      }
       .sidebar-current-case {
         margin-top: 1.25rem;
         padding: 0.75rem;
@@ -229,11 +248,13 @@ st.markdown(
       .app-page-kicker {
         display: inline-flex;
         align-items: center;
-        gap: 0.5rem;
-        margin-bottom: 0.3rem;
+        margin-bottom: 0.15rem;
+        padding-left: 0.55rem;
+        border-left: 4px solid var(--app-accent);
         color: #4C1D95;
-        font-size: 0.84rem;
-        font-weight: 700;
+        font-size: 0.78rem;
+        font-weight: 800;
+        letter-spacing: 0.04em;
       }
       .app-page-icon {
         display: inline-flex;
@@ -249,23 +270,38 @@ st.markdown(
       .app-section-heading {
         display: flex;
         align-items: center;
-        gap: 0.65rem;
-        margin: 2rem 0 0.85rem;
+        gap: 0.45rem;
+        margin: 1rem 0 0.55rem;
         color: var(--app-text);
-        font-size: 1.35rem;
+        font-size: 1.05rem;
         font-weight: 800;
       }
       .app-section-number {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 1.7rem;
-        height: 1.7rem;
+        min-width: 1.45rem;
+        height: 1.25rem;
+        padding: 0 0.35rem;
         border-radius: 999px;
         color: #fff;
         background: var(--app-accent);
-        font-size: 0.9rem;
+        font-size: 0.72rem;
         font-weight: 800;
+      }
+      .result-header {
+        margin-bottom: 0.75rem;
+      }
+      .result-title {
+        margin: 0.2rem 0 0.15rem;
+        color: var(--app-text);
+        font-size: 1.65rem;
+        line-height: 1.25;
+        font-weight: 800;
+      }
+      .result-updated {
+        color: var(--app-muted);
+        font-size: 0.85rem;
       }
       .result-summary-grid {
         display: grid;

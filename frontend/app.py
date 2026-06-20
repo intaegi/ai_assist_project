@@ -29,7 +29,7 @@ st.markdown(
         --app-accent: #0AB4F7;
         --app-accent-dark: #0795CC;
         --app-bg: #FFFFFF;
-        --app-sidebar: #F7F7F8;
+        --app-sidebar: #FFFFFF;
         --app-border: #E5E7EB;
         --app-soft: #F8FAFC;
         --app-text: #172033;
@@ -45,8 +45,13 @@ st.markdown(
         background: var(--app-sidebar);
         border-right: 1px solid var(--app-border);
       }
+      [data-testid="stSidebar"] > div,
+      [data-testid="stSidebar"] [data-testid="stSidebarContent"],
+      [data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+        background: var(--app-sidebar) !important;
+      }
       [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-        gap: 0.45rem;
+        gap: 0.5rem;
       }
       [data-stale="true"] { opacity: 1 !important; }
       .sidebar-brand {
@@ -71,16 +76,36 @@ st.markdown(
         font-weight: 800;
       }
       .sidebar-section-title {
-        margin: 1.35rem 0 0.35rem;
-        color: #344054;
-        font-size: 0.82rem;
-        font-weight: 700;
-        letter-spacing: 0.03em;
+        display: flex;
+        align-items: center;
+        gap: 0.45rem;
+        margin: 1.55rem 0 0.45rem;
+        color: var(--app-text);
+        font-size: 0.92rem;
+        font-weight: 800;
+        letter-spacing: 0.01em;
+      }
+      .sidebar-section-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 1.1rem;
+        height: 1.1rem;
+        color: var(--app-accent-dark);
+      }
+      .sidebar-section-icon svg {
+        width: 1.05rem;
+        height: 1.05rem;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
       }
       [data-testid="stSidebar"] div[data-testid="stButton"] button {
         min-height: 2.65rem;
         justify-content: flex-start;
-        padding: 0.45rem 0.8rem;
+        padding: 0.45rem 0.9rem;
         border-radius: 0.75rem;
         border: 1px solid transparent;
         box-shadow: none;
@@ -96,7 +121,7 @@ st.markdown(
         background: transparent;
       }
       [data-testid="stSidebar"] div[data-testid="stButton"] button[kind="secondary"]:hover {
-        background: #ECEFF3;
+        background: #F1F5F9;
         border-color: transparent;
       }
       .history-item {
@@ -111,7 +136,7 @@ st.markdown(
         border-radius: 0.8rem;
         background: transparent;
       }
-      .history-item:hover { background: #ECEFF3; }
+      .history-item:hover { background: #F8FAFC; }
       .history-item.active {
         background: #EAF9FE;
         border-color: #B8EAFE;

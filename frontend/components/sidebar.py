@@ -44,7 +44,21 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
         ):
             st.query_params.clear()
             page = "settings"
-        st.markdown('<div class="sidebar-section-title">作成履歴</div>', unsafe_allow_html=True)
+        st.markdown(
+            """
+            <div class="sidebar-section-title">
+              <span class="sidebar-section-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M3 12a9 9 0 1 0 3-6.7"/>
+                  <path d="M3 4v5h5"/>
+                  <path d="M12 7v5l3 2"/>
+                </svg>
+              </span>
+              <span>作成履歴</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         try:
             cases = client.list_cases()
         except Exception:

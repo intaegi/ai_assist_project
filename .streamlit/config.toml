@@ -4,6 +4,6 @@ toolbarMode = "minimal"
 [theme]
 primaryColor = "#0AB4F7"
 backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F7F7F8"
+secondaryBackgroundColor = "#FFFFFF"
 textColor = "#202833"
 font = "sans serif"

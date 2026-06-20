@@ -47,9 +47,9 @@ def test_streamlit_entrypoint_adds_project_root_to_python_path():
     assert "sys.path.insert(0, str(PROJECT_ROOT))" in source
 
 
-def test_streamlit_theme_uses_blue_primary_color():
+def test_streamlit_theme_uses_accent_primary_color():
     source = Path(".streamlit/config.toml").read_text(encoding="utf-8")
-    assert 'primaryColor = "#1769AA"' in source
+    assert 'primaryColor = "#0AB4F7"' in source
     assert 'toolbarMode = "minimal"' in source
 
 

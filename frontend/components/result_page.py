@@ -490,6 +490,10 @@ def render_result_page(client, case_id: str, history_mode: bool = False) -> None
         st.error(str(exc))
         return
     title = case.get("title") or "決裁案"
+    st.markdown(
+        '<div class="app-page-kicker"><span class="app-page-icon">□</span>AI DRAFT</div>',
+        unsafe_allow_html=True,
+    )
     st.title(title)
     st.caption(f"最終更新: {_format_datetime(case.get('updated_at'))}")
     copy_clicked = False

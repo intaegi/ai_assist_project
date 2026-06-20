@@ -24,20 +24,27 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
         page = "history"
         selected = query_case_id
     with st.sidebar:
-        st.markdown("## 決裁RAG")
-        if st.button("新規作成", use_container_width=True, type="primary" if page == "new" else "secondary"):
+        st.markdown(
+            """
+            <div class="sidebar-brand">
+              <span class="brand-mark">R</span>
+              <span>決裁RAG</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("＋ 新規作成", use_container_width=True, type="primary" if page == "new" else "secondary"):
             st.query_params.clear()
             page = "new"
             selected = None
         if st.button(
-            "初期設定",
+            "⚙ 初期設定",
             use_container_width=True,
             type="primary" if page == "settings" else "secondary",
         ):
             st.query_params.clear()
             page = "settings"
-        st.markdown("---")
-        st.markdown("**作成履歴**")
+        st.markdown('<div class="sidebar-section-title">作成履歴</div>', unsafe_allow_html=True)
         try:
             cases = client.list_cases()
         except Exception:
@@ -53,15 +60,20 @@ def render_sidebar(client, active_case_id: str | None) -> tuple[str, str | None]
                 (
                     f'<a class="history-item{active_class}" '
                     f'href="?case_id={quote(case["case_id"])}" target="_self">'
+                    '<span class="history-icon">□</span>'
+                    '<span>'
                     f'<span class="history-title">{html.escape(label)}</span>'
                     f'<span class="history-time">{html.escape(_format_history_time(case.get("updated_at")))}</span>'
+                    "</span>"
                     "</a>"
                 ),
                 unsafe_allow_html=True,
             )
         if active_case_id:
-            st.markdown("---")
-            st.caption(f"現在の案件\n{active_case_id}")
+            st.markdown(
+                f'<div class="sidebar-current-case">現在の案件<br>{html.escape(active_case_id)}</div>',
+                unsafe_allow_html=True,
+            )
     st.session_state.page = page
     st.session_state.case_id = selected
     return page, selected
